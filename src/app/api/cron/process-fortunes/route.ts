@@ -5,7 +5,6 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 export async function GET(req: Request) {
   try {
     // 1. Güvenlik Kontrolü
-<<<<<<< HEAD
     // Hem Cron (Vercel) hem de Mobil Uygulama (API Key) erişebilmeli
     const authHeader = req.headers.get('authorization');
     const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
@@ -13,13 +12,6 @@ export async function GET(req: Request) {
     const isDev = process.env.NODE_ENV === 'development';
     
     if (!isCron && !isApp && !isDev) {
-=======
-    const authHeader = req.headers.get('authorization');
-    const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    if (!isCron && !isDev) {
->>>>>>> c245a3b32bbffec7c74d9a432fe92e13646b54de
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
