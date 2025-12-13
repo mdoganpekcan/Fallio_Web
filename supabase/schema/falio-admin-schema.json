@@ -1,0 +1,345 @@
+{
+  "schema": "public",
+  "enums": [
+    {
+      "name": "user_status",
+      "values": ["active", "banned"]
+    },
+    {
+      "name": "fortune_status",
+      "values": ["pending", "completed"]
+    },
+    {
+      "name": "subscription_cycle",
+      "values": ["monthly", "yearly"]
+    },
+    {
+      "name": "subscription_status",
+      "values": ["active", "cancelled", "expired"]
+    },
+    {
+      "name": "notification_status",
+      "values": ["queued", "sent", "error"]
+    },
+    {
+      "name": "horoscope_scope",
+      "values": ["daily", "weekly", "monthly"]
+    },
+    {
+      "name": "earning_rule_type",
+      "values": ["ad", "daily", "invite"]
+    },
+    {
+      "name": "admin_role",
+      "values": ["admin", "moderator"]
+    }
+  ],
+  "tables": [
+    {
+      "name": "users",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "auth_user_id", "type": "uuid", "nullable": true },
+        { "name": "email", "type": "text", "nullable": false },
+        { "name": "full_name", "type": "text", "nullable": true },
+        { "name": "zodiac_sign", "type": "text", "nullable": true },
+        { "name": "avatar_url", "type": "text", "nullable": true },
+        { "name": "city", "type": "text", "nullable": true },
+        { "name": "status", "type": "user_status", "default": "'active'::user_status", "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "users_email_key", "unique": true, "columns": ["email"] },
+        { "name": "users_auth_user_id_key", "unique": true, "columns": ["auth_user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["auth_user_id"], "references": { "table": "auth.users", "columns": ["id"] }, "on_delete": "cascade" }
+      ]
+    },
+    {
+      "name": "profiles",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": false },
+        { "name": "birthdate", "type": "date", "nullable": true },
+        { "name": "gender", "type": "text", "nullable": true },
+        { "name": "bio", "type": "text", "nullable": true },
+        { "name": "preferred_teller_id", "type": "uuid", "nullable": true },
+        { "name": "last_login", "type": "timestamp with time zone", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "profiles_user_id_key", "unique": true, "columns": ["user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "cascade" },
+        { "columns": ["preferred_teller_id"], "references": { "table": "fortune_tellers", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    },
+    {
+      "name": "fortune_tellers",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": true },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "bio", "type": "text", "nullable": true },
+        { "name": "avatar_url", "type": "text", "nullable": true },
+        { "name": "expertise", "type": "text[]", "default": "{}", "nullable": false },
+        { "name": "price", "type": "integer", "default": 0, "nullable": false },
+        { "name": "rating", "type": "numeric(3,1)", "default": 5.0, "nullable": false },
+        { "name": "is_online", "type": "boolean", "default": false, "nullable": false },
+        { "name": "is_ai", "type": "boolean", "default": false, "nullable": false },
+        { "name": "ai_provider", "type": "text", "nullable": true },
+        { "name": "ai_model", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "fortune_tellers_user_id_idx", "columns": ["user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    },
+    {
+      "name": "fortunes",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": false },
+        { "name": "teller_id", "type": "uuid", "nullable": true },
+        { "name": "type", "type": "text", "nullable": false },
+        { "name": "status", "type": "fortune_status", "default": "'pending'::fortune_status", "nullable": false },
+        { "name": "user_note", "type": "text", "nullable": true },
+        { "name": "response", "type": "text", "nullable": true },
+        { "name": "is_read", "type": "boolean", "default": false, "nullable": false },
+        { "name": "user_rating", "type": "smallint", "nullable": true },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false },
+        { "name": "completed_at", "type": "timestamp with time zone", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "fortunes_user_id_idx", "columns": ["user_id"] },
+        { "name": "fortunes_teller_id_idx", "columns": ["teller_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "cascade" },
+        { "columns": ["teller_id"], "references": { "table": "fortune_tellers", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    },
+    {
+      "name": "fortune_images",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "fortune_id", "type": "uuid", "nullable": false },
+        { "name": "url", "type": "text", "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "fortune_images_fortune_id_idx", "columns": ["fortune_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["fortune_id"], "references": { "table": "fortunes", "columns": ["id"] }, "on_delete": "cascade" }
+      ]
+    },
+    {
+      "name": "wallet",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": false },
+        { "name": "credits", "type": "integer", "default": 0, "nullable": false },
+        { "name": "diamonds", "type": "integer", "default": 0, "nullable": false },
+        { "name": "updated_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "wallet_user_id_key", "unique": true, "columns": ["user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "cascade" }
+      ]
+    },
+    {
+      "name": "subscriptions",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": true },
+        { "name": "plan_name", "type": "text", "nullable": false },
+        { "name": "cycle", "type": "subscription_cycle", "nullable": false },
+        { "name": "status", "type": "subscription_status", "default": "'active'::subscription_status", "nullable": false },
+        { "name": "price", "type": "numeric(10,2)", "default": 0, "nullable": false },
+        { "name": "perks", "type": "text[]", "default": "{}", "nullable": false },
+        { "name": "started_at", "type": "timestamp with time zone", "default": "now()", "nullable": false },
+        { "name": "expires_at", "type": "timestamp with time zone", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "subscriptions_user_id_idx", "columns": ["user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    },
+    {
+      "name": "settings",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "integer", "default": 1, "nullable": false },
+        { "name": "theme", "type": "text", "default": "'dark'", "nullable": false },
+        { "name": "ai_enabled", "type": "boolean", "default": true, "nullable": false },
+        { "name": "support_email", "type": "text", "nullable": false },
+        { "name": "instagram", "type": "text", "nullable": true },
+        { "name": "twitter", "type": "text", "nullable": true },
+        { "name": "facebook", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false },
+        { "name": "updated_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "settings_id_key", "unique": true, "columns": ["id"] }
+      ]
+    },
+    {
+      "name": "ai_settings",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "integer", "default": 1, "nullable": false },
+        { "name": "base_prompt", "type": "text", "default": "''::text", "nullable": false },
+        { "name": "claude_api_key", "type": "text", "nullable": true },
+        { "name": "claude_model", "type": "text", "nullable": true },
+        { "name": "gemini_api_key", "type": "text", "nullable": true },
+        { "name": "gemini_model", "type": "text", "nullable": true },
+        { "name": "openai_api_key", "type": "text", "nullable": true },
+        { "name": "openai_model", "type": "text", "nullable": true },
+        { "name": "updated_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "ai_settings_id_key", "unique": true, "columns": ["id"] }
+      ]
+    },
+    {
+      "name": "notifications",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "bigint", "default": "generated always as identity", "nullable": false },
+        { "name": "user_id", "type": "uuid", "nullable": true },
+        { "name": "segment", "type": "text", "nullable": true },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "message", "type": "text", "nullable": false },
+        { "name": "status", "type": "notification_status", "default": "'queued'::notification_status", "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false },
+        { "name": "sent_at", "type": "timestamp with time zone", "nullable": true },
+        { "name": "created_by", "type": "uuid", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "notifications_user_id_idx", "columns": ["user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["user_id"], "references": { "table": "users", "columns": ["id"] }, "on_delete": "set null" },
+        { "columns": ["created_by"], "references": { "table": "admin_users", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    },
+    {
+      "name": "horoscopes",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "sign", "type": "text", "nullable": false },
+        { "name": "scope", "type": "horoscope_scope", "nullable": false },
+        { "name": "love", "type": "text", "nullable": true },
+        { "name": "money", "type": "text", "nullable": true },
+        { "name": "health", "type": "text", "nullable": true },
+        { "name": "general", "type": "text", "nullable": true },
+        { "name": "effective_date", "type": "date", "default": "current_date", "nullable": false },
+        { "name": "updated_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "horoscopes_sign_scope_key", "unique": true, "columns": ["sign", "scope", "effective_date"] }
+      ]
+    },
+    {
+      "name": "credit_packages",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "credits", "type": "integer", "nullable": false },
+        { "name": "price", "type": "numeric(10,2)", "nullable": false },
+        { "name": "active", "type": "boolean", "default": true, "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "credit_packages_name_key", "unique": true, "columns": ["name"] }
+      ]
+    },
+    {
+      "name": "earning_rules",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "type", "type": "earning_rule_type", "nullable": false },
+        { "name": "diamonds", "type": "integer", "nullable": false },
+        { "name": "active", "type": "boolean", "default": true, "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ]
+    },
+    {
+      "name": "admin_users",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "auth_user_id", "type": "uuid", "nullable": true },
+        { "name": "email", "type": "text", "nullable": false },
+        { "name": "role", "type": "admin_role", "nullable": false },
+        { "name": "display_name", "type": "text", "nullable": true },
+        { "name": "avatar_url", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false },
+        { "name": "last_login", "type": "timestamp with time zone", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "admin_users_email_key", "unique": true, "columns": ["email"] },
+        { "name": "admin_users_auth_user_id_key", "unique": true, "columns": ["auth_user_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["auth_user_id"], "references": { "table": "auth.users", "columns": ["id"] }, "on_delete": "cascade" }
+      ]
+    },
+    {
+      "name": "messages",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "uuid", "default": "gen_random_uuid()", "nullable": false },
+        { "name": "fortune_id", "type": "uuid", "nullable": false },
+        { "name": "sender_type", "type": "text", "nullable": false },
+        { "name": "body", "type": "text", "nullable": false },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "messages_fortune_id_idx", "columns": ["fortune_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["fortune_id"], "references": { "table": "fortunes", "columns": ["id"] }, "on_delete": "cascade" }
+      ]
+    },
+    {
+      "name": "logs",
+      "primary_key": "id",
+      "columns": [
+        { "name": "id", "type": "bigint", "default": "generated always as identity", "nullable": false },
+        { "name": "actor_admin_id", "type": "uuid", "nullable": true },
+        { "name": "action", "type": "text", "nullable": false },
+        { "name": "entity", "type": "text", "nullable": true },
+        { "name": "entity_id", "type": "uuid", "nullable": true },
+        { "name": "metadata", "type": "jsonb", "nullable": true },
+        { "name": "created_at", "type": "timestamp with time zone", "default": "now()", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "logs_actor_admin_id_idx", "columns": ["actor_admin_id"] }
+      ],
+      "foreign_keys": [
+        { "columns": ["actor_admin_id"], "references": { "table": "admin_users", "columns": ["id"] }, "on_delete": "set null" }
+      ]
+    }
+  ]
+}

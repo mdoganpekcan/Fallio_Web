@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0a1c;
+  --surface: #100f26;
+  --panel: #15132f;
+  --card: #1a1837;
+  --foreground: #f4f3ff;
+  --muted-foreground: #c0bed6;
+  --border: #26233f;
+  --accent: #7c5cff;
+  --accent-strong: #9a7fff;
+  --success: #2ddf74;
+  --warning: #e7a23c;
+  --danger: #ef5f6b;
+  --info: #6dd3ff;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: radial-gradient(circle at 20% 20%, rgba(124, 92, 255, 0.06), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(109, 211, 255, 0.04), transparent 30%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--foreground);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
