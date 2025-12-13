@@ -19,9 +19,36 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type") || "daily"; // daily, weekly, monthly
+    // --- AKILLI CRON MANTIĞI ---
+    // Tek bir cron job ile tüm periyotları yönetiyoruz.
+    // URL parametresi varsa onu kullan (manuel tetikleme için), yoksa tarihe göre karar ver.
     
+    const { searchParams } = new URL(req.url);
+    let typesToProcess = [];
+
+    if (searchParams.get("type")) {
+        // Manuel olarak belirli bir tip istendiyse sadece onu yap
+        typesToProcess.push(searchParams.get("type"));
+    } else {
+        // Otomatik mod: Tarihe göre karar ver
+        const today = new Date();
+        
+        // 1. Her gün "daily" çalışır
+        typesToProcess.push("daily");
+
+        // 2. Pazartesi günleri (Day 1) "weekly" çalışır
+        if (today.getDay() === 1) {
+            typesToProcess.push("weekly");
+        }
+
+        // 3. Ayın 1. günü "monthly" çalışır
+        if (today.getDate() === 1) {
+            typesToProcess.push("monthly");
+        }
+    }
+
+    console.log(`[Horoscope Cron] Processing types: ${typesToProcess.join(", ")}`);
+
     // 1. Ayarları Çek
     const { data: settings } = await supabaseAdmin.from("ai_settings").select("*").single();
     if (!settings?.gemini_api_key) {
@@ -30,21 +57,6 @@ export async function GET(req: Request) {
 
     const apiKey = settings.gemini_api_key.trim();
     
-    // Tarih Formatı Belirle
-    const today = new Date();
-    let dateRange = today.toISOString().split('T')[0]; // Varsayılan: YYYY-MM-DD
-    
-    if (type === 'weekly') {
-        // Basitçe haftanın başı ve sonunu string yapalım
-        const first = today.getDate() - today.getDay() + 1; 
-        const last = first + 6;
-        const firstDay = new Date(today.setDate(first)).toLocaleDateString("tr-TR");
-        const lastDay = new Date(today.setDate(last)).toLocaleDateString("tr-TR");
-        dateRange = `${firstDay} - ${lastDay}`;
-    } else if (type === 'monthly') {
-        dateRange = today.toLocaleDateString("tr-TR", { month: 'long', year: 'numeric' });
-    }
-
     // 2. Model Seçimi (Dinamik)
     let modelName = "gemini-1.5-flash"; // Varsayılan hızlı model
     try {
@@ -81,60 +93,83 @@ export async function GET(req: Request) {
 
     const results = [];
 
-    // 3. Tüm Burçlar İçin Döngü
-    // Not: Rate limit yememek için Promise.all yerine for döngüsü ile sırayla yapıyoruz.
-    for (const sign of ZODIAC_SIGNS) {
-        const prompt = `
-        Sen profesyonel bir astrologsun. 
-        Burç: ${sign}
-        Dönem: ${type === 'daily' ? 'Bugün' : type === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
+    // 3. Tüm Tipler ve Burçlar İçin Döngü
+    for (const type of typesToProcess) {
+        // Tarih Formatı Belirle (Her tip için ayrı)
+        const today = new Date();
+        let dateRange = today.toISOString().split('T')[0]; 
         
-        Lütfen bu burç için JSON formatında yorum oluştur. 
-        JSON şeması kesinlikle şöyle olmalı, başka hiçbir metin ekleme:
-        {
-            "general": "Genel yorum...",
-            "love": "Aşk hayatı yorumu...",
-            "career": "İş ve kariyer yorumu...",
-            "health": "Sağlık yorumu..."
+        if (type === 'weekly') {
+            const first = today.getDate() - today.getDay() + 1; 
+            const last = first + 6;
+            const firstDay = new Date(today.setDate(first)).toLocaleDateString("tr-TR");
+            const lastDay = new Date(today.setDate(last)).toLocaleDateString("tr-TR");
+            dateRange = `${firstDay} - ${lastDay}`;
+        } else if (type === 'monthly') {
+            dateRange = today.toLocaleDateString("tr-TR", { month: 'long', year: 'numeric' });
         }
-        Yorumlar samimi, motive edici ve astrolojik terimlerle süslü olsun. Türkçe olsun.
-        `;
 
-        try {
-            const result = await model.generateContent(prompt);
-            const text = result.response.text();
+        for (const sign of ZODIAC_SIGNS) {
+            const prompt = `
+            Sen profesyonel bir astrologsun. 
+            Burç: ${sign}
+            Dönem: ${type === 'daily' ? 'Bugün' : type === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
             
-            // JSON Temizliği (Markdown \`\`\`json ... \`\`\` bloklarını temizle)
-            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const content = JSON.parse(jsonStr);
+            Lütfen bu burç için JSON formatında yorum oluştur. 
+            JSON şeması kesinlikle şöyle olmalı, başka hiçbir metin ekleme:
+            {
+                "general": "Genel yorum...",
+                "love": "Aşk hayatı yorumu...",
+                "career": "İş ve kariyer yorumu...",
+                "health": "Sağlık yorumu..."
+            }
+            Yorumlar samimi, motive edici ve astrolojik terimlerle süslü olsun. Türkçe olsun.
+            `;
 
-            // Veritabanına Kaydet
-            const { error } = await supabaseAdmin
-                .from('horoscopes')
-                .upsert({
-                    zodiac_sign: sign,
-                    period_type: type,
-                    date_range: dateRange,
-                    content: content,
-                    created_at: new Date().toISOString()
-                }, { onConflict: 'zodiac_sign, period_type, date_range' });
+            try {
+                const result = await model.generateContent(prompt);
+                const response = result.response;
+                const text = response.text();
+                
+                // JSON Temizleme
+                const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const content = JSON.parse(jsonStr);
 
-            if (error) throw error;
-            results.push({ sign, status: "success" });
+                // DB'ye Kaydet
+                // Önce var mı diye bak, varsa güncelle, yoksa ekle
+                // Not: Tablo yapısına göre 'scope' alanı 'daily', 'weekly', 'monthly' olmalı
+                
+                // Upsert işlemi
+                const { error } = await supabaseAdmin
+                    .from('horoscopes')
+                    .upsert({
+                        sign: sign,
+                        scope: type, // daily, weekly, monthly
+                        general: content.general,
+                        love: content.love,
+                        money: content.career, // Şemada career -> money eşleşmesi
+                        health: content.health,
+                        effective_date: new Date().toISOString().split('T')[0], // Bugünün tarihi
+                        updated_at: new Date().toISOString()
+                    }, { 
+                        onConflict: 'sign,scope,effective_date' // Bu constraint DB'de olmalı
+                    });
 
-        } catch (error: any) {
-            console.error(`Error generating for ${sign}:`, error);
-            results.push({ sign, status: "error", message: error.message });
+                if (error) throw error;
+
+                results.push({ sign, type, status: "success" });
+                
+                // Rate limit için bekle
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+            } catch (err: any) {
+                console.error(`Error processing ${sign} (${type}):`, err);
+                results.push({ sign, type, status: "error", error: err.message });
+            }
         }
     }
 
-    return NextResponse.json({ 
-        success: true, 
-        date: dateRange,
-        type,
-        results 
-    });
-
+    return NextResponse.json({ processed: results });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
