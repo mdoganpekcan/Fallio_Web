@@ -1,6 +1,6 @@
 "use client";
 
-import { adjustUserBalance, updateUserStatus } from "@/lib/actions/admin";
+import { adjustUserBalance, updateUserStatus, deleteUser } from "@/lib/actions/admin";
 import type { User } from "@/types";
 import { useState, useTransition } from "react";
 import { Badge } from "../ui/badge";
@@ -96,6 +96,24 @@ export function UserActions({ user }: { user: User }) {
             />
             <Button type="submit" variant="outline" disabled={pending} className="w-full">
               Durumu Güncelle
+            </Button>
+          </form>
+
+          <form
+            action={(formData) => {
+              if (confirm("Bu kullanıcıyı tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+                startTransition(async () => {
+                  await deleteUser(formData);
+                  setOpen(false);
+                });
+              }
+            }}
+            className="space-y-3 pt-4 border-t border-[var(--border)]"
+          >
+            <input type="hidden" name="id" value={user.id} />
+            <p className="text-sm font-semibold text-red-500">Tehlikeli Bölge</p>
+            <Button type="submit" variant="destructive" disabled={pending} className="w-full">
+              Kullanıcıyı Tamamen Sil
             </Button>
           </form>
         </div>

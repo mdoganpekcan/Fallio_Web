@@ -112,6 +112,21 @@ export async function updateUserStatus(formData: FormData) {
   return { success: true };
 }
 
+export async function deleteUser(formData: FormData) {
+  const id = formData.get("id") as string;
+  
+  // Delete from auth.users (triggers cascade to public.users)
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+  
+  if (error) {
+    console.error("Delete User Error:", error);
+    return { error: error.message };
+  }
+  
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
 export async function adjustUserBalance(formData: FormData) {
   const id = formData.get("id") as string;
   const credits = Number(formData.get("credits"));
