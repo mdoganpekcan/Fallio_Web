@@ -1,15 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/horoscopes?type=daily",
+      "path": "/api/cron/horoscopes",
       "schedule": "0 0 * * *"
-<<<<<<< HEAD
-=======
-    },
-    {
-      "path": "/api/cron/process-fortunes",
-      "schedule": "* * * * *"
->>>>>>> c245a3b32bbffec7c74d9a432fe92e13646b54de
     }
   ]
 }
