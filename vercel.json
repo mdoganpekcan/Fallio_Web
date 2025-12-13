@@ -3,14 +3,6 @@
     {
       "path": "/api/cron/horoscopes?type=daily",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/horoscopes?type=weekly",
-      "schedule": "0 0 * * 1"
-    },
-    {
-      "path": "/api/cron/horoscopes?type=monthly",
-      "schedule": "0 0 1 * *"
     }
   ]
 }
