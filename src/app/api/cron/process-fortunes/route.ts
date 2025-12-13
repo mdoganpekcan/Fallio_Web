@@ -93,8 +93,12 @@ export async function GET(req: Request) {
         // Model Seçimi (Falcı tercihine göre veya varsayılan)
         // Şimdilik sadece Gemini destekliyoruz bu cron'da basitlik için
         let modelName = "gemini-1.5-flash";
-        if (fortune.fortune_tellers?.ai_model && fortune.fortune_tellers.ai_model.includes("gemini")) {
-            modelName = fortune.fortune_tellers.ai_model;
+        
+        // fortune_tellers bir dizi veya tek bir nesne olabilir, güvenli erişim sağlayalım
+        const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
+        
+        if (teller?.ai_model && teller.ai_model.includes("gemini")) {
+            modelName = teller.ai_model;
         }
 
         const model = genAI.getGenerativeModel({ 
