@@ -26,10 +26,10 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sistem Ayarları"
+        title="Ayarlar"
         description="Tema, yapay zeka modülü, sosyal bağlantılar ve yönetici hesapları."
       />
-      <SettingsPanel settings={settings} admins={admins} aiSettings={aiSettings} />
+      <SettingsPanel settings={settings as any} admins={admins} aiSettings={aiSettings} />
     </div>
   );
 }
