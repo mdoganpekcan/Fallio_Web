@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import OpenAI from "openai";
 
 export async function GET(req: Request) {
   try {
     // 1. Güvenlik Kontrolü
-    // Hem Cron (Vercel) hem de Mobil Uygulama (API Key) erişebilmeli
     const authHeader = req.headers.get('authorization');
     const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-    const isApp = authHeader === `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`; // Mobilden gelen anon key'i kabul et
+    const isApp = authHeader === `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`;
     const isDev = process.env.NODE_ENV === 'development';
     
     if (!isCron && !isApp && !isDev) {
@@ -16,7 +16,6 @@ export async function GET(req: Request) {
     }
 
     // 2. Bekleyen AI Fallarını Çek
-    // Not: is_ai = true olan falcıya atanmış ve status = pending olanlar
     const { data: fortunes, error: fetchError } = await supabaseAdmin
       .from("fortunes")
       .select(`
@@ -42,7 +41,7 @@ export async function GET(req: Request) {
       `)
       .eq("status", "pending")
       .eq("fortune_tellers.is_ai", true)
-      .limit(5); // Her çalışmada en fazla 5 fal işle (Timeout riskine karşı)
+      .limit(5);
 
     if (fetchError) {
       console.error("Error fetching fortunes:", fetchError);
@@ -55,11 +54,11 @@ export async function GET(req: Request) {
 
     // 3. AI Ayarlarını Çek
     const { data: settings } = await supabaseAdmin.from("ai_settings").select("*").single();
-    if (!settings?.gemini_api_key) {
-      return NextResponse.json({ error: "Gemini API Key eksik" }, { status: 500 });
+    
+    if (!settings) {
+        return NextResponse.json({ error: "AI ayarları bulunamadı" }, { status: 500 });
     }
 
-    const genAI = new GoogleGenerativeAI(settings.gemini_api_key);
     const results = [];
 
     // 4. Falları İşle
@@ -90,29 +89,45 @@ export async function GET(req: Request) {
 
         const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
 
-        // Model Seçimi (Falcı tercihine göre veya varsayılan)
-        // Şimdilik sadece Gemini destekliyoruz bu cron'da basitlik için
-        let modelName = "gemini-1.5-flash";
-        
-        // fortune_tellers bir dizi veya tek bir nesne olabilir, güvenli erişim sağlayalım
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
-        
-        if (teller?.ai_model && teller.ai_model.includes("gemini")) {
-            modelName = teller.ai_model;
+        const provider = teller?.ai_provider || 'gemini'; // Varsayılan Gemini
+        let responseText = "";
+
+        if (provider === 'openai') {
+            if (!settings.openai_api_key) throw new Error("OpenAI API Key eksik");
+            
+            const openai = new OpenAI({ apiKey: settings.openai_api_key });
+            const modelName = teller?.ai_model || settings.openai_model || "gpt-4o-mini";
+
+            const completion = await openai.chat.completions.create({
+                messages: [{ role: "user", content: fullPrompt }],
+                model: modelName,
+            });
+
+            responseText = completion.choices[0].message.content || "";
+
+        } else {
+            // Gemini (Default)
+            if (!settings.gemini_api_key) throw new Error("Gemini API Key eksik");
+
+            const genAI = new GoogleGenerativeAI(settings.gemini_api_key);
+            const modelName = teller?.ai_model || settings.gemini_model || "gemini-1.5-flash";
+            
+            const model = genAI.getGenerativeModel({ 
+                model: modelName,
+                safetySettings: [
+                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                ]
+            });
+
+            const result = await model.generateContent(fullPrompt);
+            responseText = result.response.text();
         }
 
-        const model = genAI.getGenerativeModel({ 
-            model: modelName,
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            ]
-        });
-
-        const result = await model.generateContent(fullPrompt);
-        const responseText = result.response.text();
+        if (!responseText) throw new Error("AI yanıtı boş döndü");
 
         // DB Güncelleme
         const { error: updateError } = await supabaseAdmin
@@ -127,7 +142,10 @@ export async function GET(req: Request) {
 
         if (updateError) throw updateError;
 
-        results.push({ id: fortune.id, status: "success" });
+        // Bildirim Gönder (Opsiyonel - Şimdilik logluyoruz)
+        console.log(`Notification should be sent to user ${fortune.user_id}`);
+
+        results.push({ id: fortune.id, status: "success", provider });
         
         // Rate limit koruması
         await new Promise(resolve => setTimeout(resolve, 1000));
