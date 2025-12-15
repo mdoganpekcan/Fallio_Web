@@ -44,7 +44,12 @@ export async function middleware(req: NextRequest) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/admin/login";
     redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
+    const redirectRes = NextResponse.redirect(redirectUrl);
+    // Copy cookies from res to redirectRes to ensure session updates are propagated
+    res.cookies.getAll().forEach(cookie => {
+      redirectRes.cookies.set(cookie);
+    });
+    return redirectRes;
   }
 
   let adminUser: { id: string; role: string } | null = null;
@@ -67,7 +72,12 @@ export async function middleware(req: NextRequest) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/admin/login";
     redirectUrl.searchParams.set("error", "unauthorized");
-    return NextResponse.redirect(redirectUrl);
+    const redirectRes = NextResponse.redirect(redirectUrl);
+    // Copy cookies (which now include the signOut/clear cookie directives)
+    res.cookies.getAll().forEach(cookie => {
+      redirectRes.cookies.set(cookie);
+    });
+    return redirectRes;
   }
 
   // Role-based access control
@@ -89,14 +99,22 @@ export async function middleware(req: NextRequest) {
       if (!isAllowed && !path.includes('.')) { 
          const redirectUrl = req.nextUrl.clone();
          redirectUrl.pathname = "/admin/fortunes";
-         return NextResponse.redirect(redirectUrl);
+         const redirectRes = NextResponse.redirect(redirectUrl);
+         res.cookies.getAll().forEach(cookie => {
+            redirectRes.cookies.set(cookie);
+         });
+         return redirectRes;
       }
     }
 
     if (isLoginPage) {
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = "/admin/dashboard";
-      return NextResponse.redirect(redirectUrl);
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      res.cookies.getAll().forEach(cookie => {
+        redirectRes.cookies.set(cookie);
+      });
+      return redirectRes;
     }
   }
 
