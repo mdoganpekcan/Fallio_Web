@@ -17,77 +17,11 @@ export async function generateHoroscopes(typesToProcess: string[]) {
 
   const apiKey = settings.gemini_api_key.trim();
 
-  // 2. Model Seçimi (Dinamik)
-  let modelName = "gemini-1.5-flash"; // Başlangıç varsayılanı (fallback)
+  // 2. Model Seçimi (Ayarlardan)
+  // Eğer settings'den gelen model ismi 'models/' ile başlıyorsa temizle (Google API bazen böyle döner ama SDK sade ister)
+  let rawModelName = settings.gemini_model || "gemini-1.5-flash";
+  const modelName = rawModelName.replace("models/", ""); 
   
-  try {
-    console.log("Gemini modelleri listeleniyor...");
-    const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    
-    if (!listResponse.ok) {
-      console.error(`Model listesi alınamadı. Status: ${listResponse.status}`);
-      // Hata durumunda varsayılan ile devam etmeye çalışır
-    } else {
-      const data = await listResponse.json();
-      
-      if (data.models) {
-        // generateContent metodunu destekleyen modelleri filtrele
-        const availableModels = data.models
-          .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
-          .map((m: any) => m.name.replace("models/", ""));
-
-        console.log("Kullanılabilir Gemini Modelleri:", availableModels);
-
-        if (availableModels.length > 0) {
-            // Öncelik sırasına göre model seçimi (Hızlı ve ücretsiz modeller öncelikli)
-            // gemini-1.5-flash genellikle günlük 1500 istek limitiyle en cömert olanıdır.
-            // gemini-2.5-flash şu an 20/gün limitli olabilir.
-            const preferredModels = [
-                "gemini-1.5-flash",
-                "gemini-2.0-flash",
-                "gemini-flash-latest",
-                "gemini-1.5-pro",
-                "gemini-pro",
-                "gemini-2.5-flash" // Düşük limitli olduğu için sona aldık
-            ];
-
-            let selectedModel = null;
-
-            // 1. Tam eşleşme ara (Exact Match) - Kararlı sürümleri bulmak için
-            for (const pref of preferredModels) {
-                if (availableModels.includes(pref)) {
-                    selectedModel = pref;
-                    break;
-                }
-            }
-
-            // 2. Eğer tam eşleşme yoksa, ismin içinde geçeni ara (Fallback)
-            if (!selectedModel) {
-                for (const pref of preferredModels) {
-                    const match = availableModels.find((m: string) => m.includes(pref));
-                    if (match) {
-                        selectedModel = match;
-                        break;
-                    }
-                }
-            }
-
-            // 2. Eğer tercih edilenlerden hiçbiri yoksa, listenin ilkini seç (En azından çalışsın)
-            if (!selectedModel) {
-                selectedModel = availableModels[0];
-                console.warn("Tercih edilen modeller bulunamadı, listedeki ilk model seçiliyor.");
-            }
-
-            modelName = selectedModel;
-        } else {
-            console.warn("API'den dönen uygun model bulunamadı.");
-        }
-      }
-    }
-  } catch (e) {
-    console.error("Model seçimi sırasında hata oluştu:", e);
-  }
-
   console.log(`Seçilen Aktif Model: ${modelName}`);
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -170,7 +104,7 @@ export async function generateHoroscopes(typesToProcess: string[]) {
           success = true;
 
           // Rate limit için bekle (Başarılı işlemden sonra)
-          await new Promise(resolve => setTimeout(resolve, 10000)); // 10 saniye bekle
+          await new Promise(resolve => setTimeout(resolve, 12000)); // 12 saniye bekle
 
         } catch (err: any) {
           console.error(`Error processing ${sign} (${type}) - Attempt ${retryCount + 1}:`, err.message);

@@ -7,9 +7,10 @@ type ProviderModels = {
   openai: string[];
 };
 
+// Fallback listesini güncel ve garanti modellerle tutuyoruz
 const fallbackModels: ProviderModels = {
-  claude: ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-  gemini: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro-vision"],
+  claude: ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229"],
+  gemini: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"],
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
 };
 
@@ -21,10 +22,19 @@ async function fetchOpenAIModels(apiKey?: string): Promise<string[]> {
       cache: "no-store",
     });
     if (!res.ok) return fallbackModels.openai;
+    
     const json = (await res.json()) as { data?: { id: string }[] };
     const ids = json.data?.map((m) => m.id) ?? [];
-    // Filter to chat-capable models we care about
-    return ids.filter((id) => id.includes("gpt-4") || id.includes("gpt-4o") || id.includes("gpt-3.5")).slice(0, 10);
+    
+    // Sadece GPT ve o1 modellerini al, audio/realtime gibi gereksizleri ele
+    const chatModels = ids.filter((id) => 
+      (id.startsWith("gpt-4") || id.startsWith("gpt-3.5") || id.startsWith("o1-")) &&
+      !id.includes("audio") && 
+      !id.includes("realtime")
+    );
+
+    // Alfabetik sırala ama tersine (Genelde yeni modeller üstte kalsın diye)
+    return chatModels.sort().reverse().slice(0, 15); 
   } catch {
     return fallbackModels.openai;
   }
@@ -33,13 +43,30 @@ async function fetchOpenAIModels(apiKey?: string): Promise<string[]> {
 async function fetchGeminiModels(apiKey?: string): Promise<string[]> {
   if (!apiKey) return fallbackModels.gemini;
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
       cache: "no-store",
     });
     if (!res.ok) return fallbackModels.gemini;
+    
     const json = (await res.json()) as { models?: { name: string }[] };
+    
+    // API "models/gemini-1.5-flash" döner, biz sadece "gemini-1.5-flash" kısmını almalıyız.
     const ids = json.models?.map((m) => m.name.split("/").pop() || m.name) ?? [];
-    return ids.filter((id) => id.startsWith("gemini")).slice(0, 10);
+
+    // Filtreleme: Embedding modellerini ve vision-only eski modelleri çıkar
+    const chatModels = ids.filter((id) => 
+      id.startsWith("gemini") && 
+      !id.includes("embedding") &&
+      !id.includes("bison") // Eski model
+    );
+
+    // Versiyon önceliği: Experimental veya yeni versiyonları üste taşıyalım
+    return chatModels.sort((a, b) => {
+        // "exp" veya "2.0" içerenleri yukarı al
+        const aScore = (a.includes("1.5") ? 2 : 0) + (a.includes("flash") ? 1 : 0) + (a.includes("2.0") ? 3 : 0);
+        const bScore = (b.includes("1.5") ? 2 : 0) + (b.includes("flash") ? 1 : 0) + (b.includes("2.0") ? 3 : 0);
+        return bScore - aScore;
+    });
   } catch {
     return fallbackModels.gemini;
   }
@@ -56,16 +83,18 @@ async function fetchClaudeModels(apiKey?: string): Promise<string[]> {
       cache: "no-store",
     });
     if (!res.ok) return fallbackModels.claude;
+    
     const json = (await res.json()) as { data?: { id: string }[] };
     const ids = json.data?.map((m) => m.id) ?? [];
-    return ids.filter((id) => id.startsWith("claude")).slice(0, 10);
+    
+    // Sadece Claude modellerini al
+    return ids.filter((id) => id.startsWith("claude")).sort().reverse();
   } catch {
     return fallbackModels.claude;
   }
 }
 
 export async function GET() {
-  // Load keys from ai_settings (id=1)
   const { data } = await supabaseAdmin
     .from("ai_settings")
     .select("claude_api_key, gemini_api_key, openai_api_key")
