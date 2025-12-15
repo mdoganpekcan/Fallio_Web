@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase-admin";
 import type {
   AISettings,
   AdminUser,
+  AppConfig,
   CreditPackage,
   EarningRule,
   Fortune,
@@ -13,6 +14,37 @@ import type {
   SubscriptionPlan,
   User,
 } from "@/types";
+
+export async function fetchAppConfig(): Promise<AppConfig> {
+  const { data, error } = await supabaseAdmin
+    .from("app_config")
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Error fetching app config:", error);
+    // Return default values if table doesn't exist or empty
+    return {
+      id: 1,
+      ad_reward_amount: 1,
+      welcome_credits: 500,
+      daily_free_fortune_limit: 0,
+      maintenance_mode: false,
+      contact_email: "destek@fallio.com",
+      fortune_costs: {
+        coffee: 50,
+        tarot: 150,
+        palm: 150,
+        dream: 5,
+        love: 100,
+        card: 100,
+        color: 50
+      },
+    };
+  }
+
+  return data as AppConfig;
+}
 
 export async function fetchDashboardStats() {
   const [usersRes, fortunesRes, tellersRes] = await Promise.all([

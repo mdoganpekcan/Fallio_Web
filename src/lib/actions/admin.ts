@@ -4,6 +4,48 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "../supabase-admin";
 import { sendPushNotification } from "../notifications";
 
+export async function upsertAppConfig(formData: FormData) {
+  const ad_reward_amount = Number(formData.get("ad_reward_amount") || 1);
+  const welcome_credits = Number(formData.get("welcome_credits") || 500);
+  const daily_free_fortune_limit = Number(formData.get("daily_free_fortune_limit") || 0);
+  const maintenance_mode = formData.get("maintenance_mode") === "on";
+  const contact_email = formData.get("contact_email") as string;
+  
+  // Fortune costs (JSON)
+  const fortune_costs: Record<string, number> = {};
+  const types = ["coffee", "tarot", "palm", "dream", "love", "card", "color"];
+  types.forEach(type => {
+    const cost = Number(formData.get(`cost_${type}`) || 0);
+    fortune_costs[type] = cost;
+  });
+
+  const payload = {
+    id: 1,
+    ad_reward_amount,
+    welcome_credits,
+    daily_free_fortune_limit,
+    maintenance_mode,
+    contact_email,
+    fortune_costs,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("app_config")
+      .upsert(payload);
+
+    if (error) {
+      console.error("Supabase Error:", error);
+      return { error: error.message };
+    }
+    revalidatePath("/admin/settings");
+  } catch (e: any) {
+    console.error("Server Action Error:", e);
+    return { error: e.message || "Bir hata oluştu" };
+  }
+}
+
 export async function upsertTeller(formData: FormData) {
   const id = (formData.get("id") as string) || null;
   const name = formData.get("name") as string;
