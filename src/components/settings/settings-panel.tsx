@@ -376,7 +376,6 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                 name="claude_model"
                 defaultValue={safeAI.claude_model || providerModels.claude[0]?.value}
                 options={providerModels.claude}
-                placeholder="Model Seçin"
               />
             </div>
 
@@ -395,7 +394,6 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                 name="gemini_model"
                 defaultValue={safeAI.gemini_model || providerModels.gemini[0]?.value}
                 options={providerModels.gemini}
-                placeholder="Model Seçin"
               />
             </div>
 
@@ -414,7 +412,6 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                 name="openai_model"
                 defaultValue={safeAI.openai_model || providerModels.openai[0]?.value}
                 options={providerModels.openai}
-                placeholder="Model Seçin"
               />
             </div>
 
