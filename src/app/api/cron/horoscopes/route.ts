@@ -17,11 +17,12 @@ export async function GET(req: Request) {
     // URL parametresi varsa onu kullan (manuel tetikleme için), yoksa tarihe göre karar ver.
     
     const { searchParams } = new URL(req.url);
-    let typesToProcess = [];
+    let typesToProcess: string[] = [];
 
-    if (searchParams.get("type")) {
+    const typeParam = searchParams.get("type");
+    if (typeParam) {
         // Manuel olarak belirli bir tip istendiyse sadece onu yap
-        typesToProcess.push(searchParams.get("type"));
+        typesToProcess.push(typeParam);
     } else {
         // Otomatik mod: Tarihe göre karar ver
         const today = new Date();
