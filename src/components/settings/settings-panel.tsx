@@ -1,7 +1,7 @@
 "use client";
 
-import { upsertAISettings, upsertAdminUser, upsertSetting } from "@/lib/actions/admin";
-import type { AISettings, AdminUser, Settings } from "@/types";
+import { upsertAISettings, upsertAdminUser, upsertSetting, upsertAppConfig } from "@/lib/actions/admin";
+import type { AISettings, AdminUser, Settings, AppConfig } from "@/types";
 import { useEffect, useState, useTransition } from "react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -16,12 +16,16 @@ type Props = {
   settings: Settings;
   admins: AdminUser[];
   aiSettings: AISettings;
+  appConfig: AppConfig;
 };
 
-export function SettingsPanel({ settings, admins, aiSettings }: Props) {
+export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props) {
   const [aiEnabled, setAiEnabled] = useState(settings.ai_enabled);
   const [pending, startTransition] = useTransition();
   const [aiPending, startAiTransition] = useTransition();
+  const [configPending, startConfigTransition] = useTransition();
+  const [maintenanceMode, setMaintenanceMode] = useState(appConfig.maintenance_mode);
+
   const safeAI =
     aiSettings ?? {
       id: 1,
@@ -72,6 +76,120 @@ export function SettingsPanel({ settings, admins, aiSettings }: Props) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr,360px]">
+      <Card className="xl:col-span-2">
+        <CardHeader
+          title="Uygulama Yapılandırması"
+          description="Kredi, ödül ve bakım modu ayarları."
+        />
+        <CardContent className="space-y-4">
+          <form
+            action={(formData) =>
+              startConfigTransition(async () => {
+                const res = await upsertAppConfig(formData);
+                if (res?.error) {
+                  alert(res.error);
+                }
+              })
+            }
+            className="space-y-6"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      Bakım Modu
+                    </p>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Uygulamayı geçici olarak erişime kapatın.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={maintenanceMode}
+                    onCheckedChange={(value) => setMaintenanceMode(value)}
+                  />
+                  <input
+                    type="hidden"
+                    name="maintenance_mode"
+                    value={maintenanceMode ? "on" : "off"}
+                    readOnly
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white">İletişim E-postası</label>
+                <Input
+                  name="contact_email"
+                  defaultValue={appConfig.contact_email}
+                  placeholder="destek@fallio.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white">Reklam Ödülü (Kredi)</label>
+                <Input
+                  name="ad_reward_amount"
+                  type="number"
+                  defaultValue={appConfig.ad_reward_amount}
+                  min={0}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white">Hoşgeldin Kredisi</label>
+                <Input
+                  name="welcome_credits"
+                  type="number"
+                  defaultValue={appConfig.welcome_credits}
+                  min={0}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white">Günlük Ücretsiz Fal Limiti</label>
+                <Input
+                  name="daily_free_fortune_limit"
+                  type="number"
+                  defaultValue={appConfig.daily_free_fortune_limit}
+                  min={0}
+                  placeholder="0 = Kapalı"
+                  required
+                />
+                <p className="text-xs text-[var(--muted-foreground)]">0 girerseniz özellik kapanır.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-white border-b border-[var(--border)] pb-2">Fal Fiyatları (Kredi)</p>
+              <div className="grid gap-4 md:grid-cols-4">
+                {Object.entries(appConfig.fortune_costs || {}).map(([type, cost]) => (
+                  <div key={type} className="space-y-1">
+                    <label className="text-xs font-medium text-[var(--muted-foreground)] capitalize">{type}</label>
+                    <Input
+                      name={`cost_${type}`}
+                      type="number"
+                      defaultValue={cost}
+                      min={0}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={configPending}>
+                Yapılandırmayı Kaydet
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader
           title="Genel Ayarlar"
