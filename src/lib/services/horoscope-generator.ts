@@ -16,12 +16,11 @@ export async function generateHoroscopes(typesToProcess: string[]) {
   }
 
   const apiKey = settings.gemini_api_key.trim();
-
-  // 2. Model Seçimi (Ayarlardan)
-  // Eğer settings'den gelen model ismi 'models/' ile başlıyorsa temizle (Google API bazen böyle döner ama SDK sade ister)
-  let rawModelName = settings.gemini_model || "gemini-1.5-flash";
-  const modelName = rawModelName.replace("models/", ""); 
   
+  // Model ismini temizle
+  let rawModelName = settings.gemini_model || "gemini-1.5-flash";
+  const modelName = rawModelName.replace("models/", "");
+
   console.log(`Seçilen Aktif Model: ${modelName}`);
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -32,99 +31,104 @@ export async function generateHoroscopes(typesToProcess: string[]) {
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
       { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    ]
+    ],
+    generationConfig: {
+        responseMimeType: "application/json"
+    }
   });
 
-  // 3. Tüm Tipler ve Burçlar İçin Döngü
+  // 2. Döngü: Sadece TİP (Daily/Weekly) bazında döner, Burç bazında dönmez!
   for (const type of typesToProcess) {
-    // Tarih Formatı Belirle (Her tip için ayrı)
-    const today = new Date();
-    let dateRange = today.toISOString().split('T')[0];
+    console.log(`[Batch] Processing horoscopes for type: ${type}`);
+    
+    // Tek bir prompt ile HEPSİNİ istiyoruz
+    const prompt = `
+      Sen profesyonel bir astrologsun.
+      Dönem: ${type === 'daily' ? 'Bugün' : type === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
+      
+      Aşağıdaki 12 burç için tek seferde yorum üret:
+      ${ZODIAC_SIGNS.join(", ")}
 
-    if (type === 'weekly') {
-      const first = today.getDate() - today.getDay() + 1;
-      const last = first + 6;
-      const firstDay = new Date(today.setDate(first)).toLocaleDateString("tr-TR");
-      const lastDay = new Date(today.setDate(last)).toLocaleDateString("tr-TR");
-      dateRange = `${firstDay} - ${lastDay}`;
-    } else if (type === 'monthly') {
-      dateRange = today.toLocaleDateString("tr-TR", { month: 'long', year: 'numeric' });
-    }
+      Lütfen yanıtı SADECE geçerli bir JSON formatında ver.
+      Yanıt şu yapıda bir Array (Liste) olmalı:
+      [
+        {
+          "sign": "koc",
+          "general": "...",
+          "love": "...",
+          "career": "...",
+          "health": "..."
+        },
+        ... diğer burçlar
+      ]
+      
+      Kurallar:
+      1. "sign" alanı kesinlikle şu listeden biri olmalı (küçük harf, Türkçe karakter yok): koc, boga, ikizler, yengec, aslan, basak, terazi, akrep, yay, oglak, kova, balik.
+      2. Yorumlar samimi, motive edici ve Türkçe olsun. 
+      3. "career" alanı iş ve para durumunu kapsamalıdır.
+    `;
 
-    for (const sign of ZODIAC_SIGNS) {
-      const prompt = `
-            Sen profesyonel bir astrologsun. 
-            Burç: ${sign}
-            Dönem: ${type === 'daily' ? 'Bugün' : type === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
-            
-            Lütfen bu burç için JSON formatında yorum oluştur. 
-            JSON şeması kesinlikle şöyle olmalı, başka hiçbir metin ekleme:
-            {
-                "general": "Genel yorum...",
-                "love": "Aşk hayatı yorumu...",
-                "career": "İş ve kariyer yorumu...",
-                "health": "Sağlık yorumu..."
-            }
-            Yorumlar samimi, motive edici ve astrolojik terimlerle süslü olsun. Türkçe olsun.
-            `;
+    try {
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
 
-      let retryCount = 0;
-      const maxRetries = 3;
-      let success = false;
+      // JSON Temizleme (Markdown blocklarını temizle)
+      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let horoscopesBatch;
+      
+      try {
+        horoscopesBatch = JSON.parse(jsonStr);
+      } catch (e) {
+        console.error("JSON Parse Hatası:", text);
+        throw new Error("AI yanıtı JSON formatında değildi.");
+      }
 
-      while (!success && retryCount < maxRetries) {
-        try {
-          const result = await model.generateContent(prompt);
-          const response = result.response;
-          const text = response.text();
+      if (!Array.isArray(horoscopesBatch)) {
+          throw new Error("AI yanıtı bir dizi (array) değil.");
+      }
 
-          // JSON Temizleme
-          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-          const content = JSON.parse(jsonStr);
+      // 3. Gelen toplu veriyi veritabanına kaydet
+      for (const item of horoscopesBatch) {
+        // Sign isminin doğruluğunu kontrol et
+        const signKey = item.sign?.toLowerCase();
+        
+        if (!ZODIAC_SIGNS.includes(signKey)) {
+            console.warn(`Geçersiz burç ismi atlandı: ${signKey}`);
+            continue;
+        }
+        
+        const { error } = await supabaseAdmin
+          .from('horoscopes')
+          .upsert({
+            sign: signKey,
+            scope: type,
+            general: item.general,
+            love: item.love,
+            money: item.career, // Şemada career -> money eşleşmesi
+            health: item.health,
+            effective_date: new Date().toISOString().split('T')[0],
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'sign,scope,effective_date'
+          });
 
-          // DB'ye Kaydet
-          const { error } = await supabaseAdmin
-            .from('horoscopes')
-            .upsert({
-              sign: sign,
-              scope: type, // daily, weekly, monthly
-              general: content.general,
-              love: content.love,
-              money: content.career, // Şemada career -> money eşleşmesi
-              health: content.health,
-              effective_date: new Date().toISOString().split('T')[0], // Bugünün tarihi
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'sign,scope,effective_date'
-            });
-
-          if (error) throw error;
-
-          results.push({ sign, type, status: "success" });
-          success = true;
-
-          // Rate limit için bekle (Başarılı işlemden sonra)
-          await new Promise(resolve => setTimeout(resolve, 12000)); // 12 saniye bekle
-
-        } catch (err: any) {
-          console.error(`Error processing ${sign} (${type}) - Attempt ${retryCount + 1}:`, err.message);
-          
-          if (err.message?.includes("429") || err.status === 429) {
-             retryCount++;
-             const waitTime = 15000 * retryCount; // 15s, 30s, 45s bekle
-             console.log(`Rate limit aşıldı. ${waitTime / 1000} saniye bekleniyor...`);
-             await new Promise(resolve => setTimeout(resolve, waitTime));
-          } else {
-             // Diğer hatalarda döngüyü kır
-             results.push({ sign, type, status: "error", error: err.message });
-             break;
-          }
+        if (error) {
+            console.error(`DB Error for ${signKey}:`, error.message);
+            results.push({ sign: signKey, type, status: "error", error: error.message });
+        } else {
+            results.push({ sign: signKey, type, status: "success" });
         }
       }
-      
-      if (!success && retryCount >= maxRetries) {
-          results.push({ sign, type, status: "error", error: "Max retries exceeded due to rate limits." });
-      }
+
+    } catch (err: any) {
+      console.error(`Batch Error for ${type}:`, err.message);
+      results.push({ type, status: "fatal_error", error: err.message });
+    }
+    
+    // Tipler arasında (Daily bitti, Weekly'e geçerken) biraz bekle
+    if (typesToProcess.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
