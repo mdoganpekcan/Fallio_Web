@@ -1,6 +1,6 @@
 "use client";
 
-import { sendNotification } from "@/lib/actions/admin";
+import { sendNotification, deleteNotification, processNotification } from "@/lib/actions/admin";
 import type { NotificationItem } from "@/types";
 import { useState, useTransition } from "react";
 import { Tabs } from "../ui/tabs";
@@ -60,8 +60,12 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                 ]}
               />
             )}
+            <label className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+              <input type="checkbox" name="send_now" value="true" />
+              Hemen Gönder
+            </label>
             <Button type="submit" disabled={pending} className="w-full">
-              Bildirimi Gönder
+              Bildirimi Oluştur
             </Button>
           </form>
         </CardContent>
@@ -103,6 +107,24 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                   );
                 },
               },
+              {
+                key: "actions",
+                header: "İşlemler",
+                render: (item) => (
+                  <div className="flex gap-2">
+                    {item.status === 'queued' && (
+                      <form action={processNotification}>
+                        <input type="hidden" name="id" value={item.id} />
+                        <Button size="sm" variant="outline" type="submit">Gönder</Button>
+                      </form>
+                    )}
+                    <form action={deleteNotification}>
+                      <input type="hidden" name="id" value={item.id} />
+                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
+                    </form>
+                  </div>
+                )
+              }
             ]}
             empty="Bildirim bulunamadı."
           />

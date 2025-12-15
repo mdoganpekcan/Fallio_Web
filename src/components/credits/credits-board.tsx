@@ -1,6 +1,10 @@
 "use client";
 
-import { upsertCreditPackage, upsertEarningRule, upsertSubscription } from "@/lib/actions/admin";
+import { 
+  upsertCreditPackage, upsertEarningRule, upsertSubscription, 
+  deleteCreditPackage, deleteEarningRule, deleteSubscription,
+  toggleCreditPackageStatus, toggleEarningRuleStatus 
+} from "@/lib/actions/admin";
 import type { CreditPackage, EarningRule, SubscriptionPlan } from "@/types";
 import { useState, useTransition } from "react";
 import { Tabs } from "../ui/tabs";
@@ -59,11 +63,27 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "active",
                   header: "Durum",
                   render: (pkg) => (
-                    <Badge variant={pkg.active ? "success" : "muted"}>
-                      {pkg.active ? "Aktif" : "Pasif"}
-                    </Badge>
+                    <form action={toggleCreditPackageStatus}>
+                      <input type="hidden" name="id" value={pkg.id} />
+                      <input type="hidden" name="active" value={String(pkg.active)} />
+                      <button type="submit">
+                        <Badge variant={pkg.active ? "success" : "muted"} className="cursor-pointer hover:opacity-80">
+                          {pkg.active ? "Aktif" : "Pasif"}
+                        </Badge>
+                      </button>
+                    </form>
                   ),
                 },
+                {
+                  key: "actions",
+                  header: "İşlemler",
+                  render: (pkg) => (
+                    <form action={deleteCreditPackage}>
+                      <input type="hidden" name="id" value={pkg.id} />
+                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
+                    </form>
+                  )
+                }
               ]}
               empty="Paket bulunamadı."
             />
@@ -109,11 +129,27 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "active",
                   header: "Durum",
                   render: (rule) => (
-                    <Badge variant={rule.active ? "success" : "muted"}>
-                      {rule.active ? "Aktif" : "Pasif"}
-                    </Badge>
+                    <form action={toggleEarningRuleStatus}>
+                      <input type="hidden" name="id" value={rule.id} />
+                      <input type="hidden" name="active" value={String(rule.active)} />
+                      <button type="submit">
+                        <Badge variant={rule.active ? "success" : "muted"} className="cursor-pointer hover:opacity-80">
+                          {rule.active ? "Aktif" : "Pasif"}
+                        </Badge>
+                      </button>
+                    </form>
                   ),
                 },
+                {
+                  key: "actions",
+                  header: "İşlemler",
+                  render: (rule) => (
+                    <form action={deleteEarningRule}>
+                      <input type="hidden" name="id" value={rule.id} />
+                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
+                    </form>
+                  )
+                }
               ]}
               empty="Kural bulunamadı."
             />
@@ -176,6 +212,16 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                     </div>
                   ),
                 },
+                {
+                  key: "actions",
+                  header: "İşlemler",
+                  render: (sub) => (
+                    <form action={deleteSubscription}>
+                      <input type="hidden" name="id" value={sub.id} />
+                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
+                    </form>
+                  )
+                }
               ]}
               empty="Abonelik bulunamadı."
             />

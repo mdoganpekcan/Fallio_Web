@@ -134,6 +134,24 @@ export async function upsertCreditPackage(formData: FormData) {
   return { success: true };
 }
 
+export async function toggleCreditPackageStatus(formData: FormData) {
+  const id = formData.get("id") as string;
+  const isActive = formData.get("active") === "true";
+  const { error } = await supabaseAdmin.from("credit_packages").update({ active: !isActive }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/credits");
+  return { success: true };
+}
+
+export async function toggleEarningRuleStatus(formData: FormData) {
+  const id = formData.get("id") as string;
+  const isActive = formData.get("active") === "true";
+  const { error } = await supabaseAdmin.from("earning_rules").update({ active: !isActive }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/credits");
+  return { success: true };
+}
+
 export async function deleteCreditPackage(formData: FormData) {
   const id = formData.get("id") as string;
   const { error } = await supabaseAdmin.from("credit_packages").delete().eq("id", id);
@@ -239,15 +257,73 @@ export async function sendNotification(formData: FormData) {
   const message = formData.get("message") as string;
   const segment = formData.get("segment") as string;
   const user_id = formData.get("user_id") as string | null;
-  const { error } = await supabaseAdmin.from("notifications").insert({
+  const shouldSendNow = formData.get("send_now") === "true";
+
+  const { data, error } = await supabaseAdmin.from("notifications").insert({
     title,
     message,
     segment,
     user_id: user_id || null,
-    status: "queued",
-  });
+    status: shouldSendNow ? "sent" : "queued",
+    sent_at: shouldSendNow ? new Date().toISOString() : null
+  }).select().single();
+
+  if (error) return { error: error.message };
+
+  if (shouldSendNow && segment === 'single' && user_id) {
+      await sendPushNotification(user_id, title, message);
+  }
+
+  revalidatePath("/admin/notifications");
+  return { success: true };
+}
+
+export async function deleteNotification(formData: FormData) {
+  const id = formData.get("id") as string;
+  const { error } = await supabaseAdmin.from("notifications").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/notifications");
+  return { success: true };
+}
+
+export async function processNotification(formData: FormData) {
+  const id = formData.get("id") as string;
+  
+  const { data: notification, error: fetchError } = await supabaseAdmin
+    .from("notifications")
+    .select("*")
+    .eq("id", id)
+    .single();
+    
+  if (fetchError || !notification) return { error: "Bildirim bulunamadı." };
+  
+  if (notification.segment === 'single' && notification.user_id) {
+     await sendPushNotification(notification.user_id, notification.title, notification.message);
+  }
+  
+  const { error } = await supabaseAdmin
+    .from("notifications")
+    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/notifications");
+  return { success: true };
+}
+
+export async function deleteSubscription(formData: FormData) {
+  const id = formData.get("id") as string;
+  const { error } = await supabaseAdmin.from("subscriptions").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/credits");
+  return { success: true };
+}
+
+export async function deleteEarningRule(formData: FormData) {
+  const id = formData.get("id") as string;
+  const { error } = await supabaseAdmin.from("earning_rules").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/credits");
   return { success: true };
 }
 
