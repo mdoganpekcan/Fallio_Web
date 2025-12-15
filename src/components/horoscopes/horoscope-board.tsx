@@ -1,11 +1,13 @@
 "use client";
 
 import { saveHoroscope } from "@/lib/actions/admin";
+import { triggerHoroscopeGeneration } from "@/app/admin/(protected)/horoscopes/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useMemo, useState, useTransition } from "react";
+import { Sparkles } from "lucide-react";
 
 type HoroscopeRecord = {
   love?: string;
@@ -43,6 +45,27 @@ export function HoroscopeBoard({
   const [scope, setScope] = useState<string>("daily");
   const [selectedSign, setSelectedSign] = useState<string>("Koç");
   const [pending, startTransition] = useTransition();
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!confirm(`${scopes.find(s => s.value === scope)?.label} burç yorumlarını şimdi oluşturmak istiyor musunuz? Bu işlem biraz zaman alabilir.`)) {
+      return;
+    }
+    
+    setGenerating(true);
+    try {
+      const result = await triggerHoroscopeGeneration(scope);
+      if (result.success) {
+        alert(result.message);
+      } else {
+        alert(`Hata: ${result.message}`);
+      }
+    } catch (e) {
+      alert("Bir hata oluştu.");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const current = useMemo(() => {
     const key = `${selectedSign}-${scope}`;
@@ -53,6 +76,22 @@ export function HoroscopeBoard({
     <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
       <div className="space-y-4">
         <Tabs items={scopes} defaultValue={scope} onChange={(val) => setScope(val)} />
+        
+        <Button 
+          onClick={handleGenerate} 
+          disabled={generating}
+          className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+        >
+          {generating ? (
+            "Oluşturuluyor..."
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {scopes.find(s => s.value === scope)?.label} Yorumlarını Üret
+            </>
+          )}
+        </Button>
+
         <div className="grid grid-cols-2 gap-3">
           {signs.map((sign) => {
             const isActive = sign === selectedSign;
