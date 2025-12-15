@@ -18,27 +18,63 @@ export async function generateHoroscopes(typesToProcess: string[]) {
   const apiKey = settings.gemini_api_key.trim();
 
   // 2. Model Seçimi (Dinamik)
-  let modelName = "gemini-1.5-flash"; // Varsayılan hızlı model
+  let modelName = "gemini-1.5-flash"; // Başlangıç varsayılanı (fallback)
+  
   try {
+    console.log("Gemini modelleri listeleniyor...");
     const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (listResponse.ok) {
+    
+    if (!listResponse.ok) {
+      console.error(`Model listesi alınamadı. Status: ${listResponse.status}`);
+      // Hata durumunda varsayılan ile devam etmeye çalışır
+    } else {
       const data = await listResponse.json();
+      
       if (data.models) {
-        const available = data.models
+        // generateContent metodunu destekleyen modelleri filtrele
+        const availableModels = data.models
           .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
           .map((m: any) => m.name.replace("models/", ""));
 
-        // Flash modelini önceliklendir
-        if (available.some((m: string) => m.includes("1.5-flash"))) {
-          modelName = available.find((m: string) => m.includes("1.5-flash")) || "gemini-1.5-flash";
-        } else if (available.some((m: string) => m.includes("1.5-pro"))) {
-          modelName = available.find((m: string) => m.includes("1.5-pro")) || "gemini-1.5-pro";
+        console.log("Kullanılabilir Gemini Modelleri:", availableModels);
+
+        if (availableModels.length > 0) {
+            // Öncelik sırasına göre model seçimi
+            const preferredModels = [
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-pro",
+                "gemini-1.0-pro"
+            ];
+
+            let selectedModel = null;
+
+            // 1. Tam eşleşme veya versiyon içeren en iyi modeli ara
+            for (const pref of preferredModels) {
+                const match = availableModels.find((m: string) => m.includes(pref));
+                if (match) {
+                    selectedModel = match;
+                    break;
+                }
+            }
+
+            // 2. Eğer tercih edilenlerden hiçbiri yoksa, listenin ilkini seç (En azından çalışsın)
+            if (!selectedModel) {
+                selectedModel = availableModels[0];
+                console.warn("Tercih edilen modeller bulunamadı, listedeki ilk model seçiliyor.");
+            }
+
+            modelName = selectedModel;
+        } else {
+            console.warn("API'den dönen uygun model bulunamadı.");
         }
       }
     }
   } catch (e) {
-    console.warn("Model listesi çekilemedi, varsayılan kullanılıyor.");
+    console.error("Model seçimi sırasında hata oluştu:", e);
   }
+
+  console.log(`Seçilen Aktif Model: ${modelName}`);
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
