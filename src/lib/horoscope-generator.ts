@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,29 +23,15 @@ export async function generateDailyHoroscopes() {
   // Fetch settings
   const { data: settings } = await supabase.from("ai_settings").select("*").single();
   
-  const apiKey = (settings?.gemini_api_key || process.env.GEMINI_API_KEY || "").trim();
-  
-  if (!apiKey) {
-    console.error("Gemini API Key not found in settings or env");
+  if (!settings) {
+    console.error("AI Settings not found");
     return;
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = settings?.gemini_model || "gemini-1.5-flash";
-
-  const model = genAI.getGenerativeModel({ 
-    model: modelName,
-    safetySettings: [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    ]
-  });
+  const activeProvider = settings.active_provider || "gemini";
+  console.log(`Generating daily horoscopes using ${activeProvider}...`);
 
   const today = new Date().toISOString().split('T')[0];
-
-  console.log(`Generating daily horoscopes for ${today}...`);
 
   for (const sign of ZODIAC_SIGNS) {
     const signName = ZODIAC_NAMES[sign];
@@ -59,11 +47,59 @@ export async function generateDailyHoroscopes() {
       }
     `;
 
+    let generatedText = "";
+
     try {
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text().replace(/```json|```/g, '').trim();
-      const data = JSON.parse(text);
+      if (activeProvider === "openai") {
+        const apiKey = settings.openai_api_key;
+        if (!apiKey) throw new Error("OpenAI API Key missing");
+        
+        const openai = new OpenAI({ apiKey });
+        const completion = await openai.chat.completions.create({
+          messages: [{ role: "user", content: prompt }],
+          model: settings.openai_model || "gpt-4o",
+          response_format: { type: "json_object" }
+        });
+        generatedText = completion.choices[0].message.content || "";
+
+      } else if (activeProvider === "claude") {
+        const apiKey = settings.claude_api_key;
+        if (!apiKey) throw new Error("Claude API Key missing");
+
+        const anthropic = new Anthropic({ apiKey });
+        const msg = await anthropic.messages.create({
+          model: settings.claude_model || "claude-3-opus-20240229",
+          max_tokens: 1024,
+          messages: [{ role: "user", content: prompt }],
+        });
+        // @ts-ignore
+        generatedText = msg.content[0].text;
+
+      } else {
+        // Default to Gemini
+        const apiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || "").trim();
+        if (!apiKey) throw new Error("Gemini API Key missing");
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const modelName = settings.gemini_model || "gemini-1.5-flash";
+        
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          ]
+        });
+
+        const result = await model.generateContent(prompt);
+        generatedText = result.response.text();
+      }
+
+      // Parse JSON
+      const cleanText = generatedText.replace(/```json|```/g, '').trim();
+      const data = JSON.parse(cleanText);
 
       const { error } = await supabase.from('horoscope_daily').upsert({
         zodiac_sign: sign,
@@ -79,7 +115,7 @@ export async function generateDailyHoroscopes() {
       else console.log(`Saved ${sign}`);
 
     } catch (e) {
-      console.error(`Failed to generate for ${sign}:`, e);
+      console.error(`Failed to generate for ${sign} (${activeProvider}):`, e);
     }
   }
 }

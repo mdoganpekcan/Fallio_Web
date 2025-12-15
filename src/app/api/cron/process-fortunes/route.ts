@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 export async function GET(req: Request) {
   try {
@@ -90,31 +91,59 @@ export async function GET(req: Request) {
         const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
 
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
-        const provider = teller?.ai_provider || 'gemini'; // Varsayılan Gemini
+        
+        // Determine Provider
+        let provider = settings.active_provider || 'gemini';
+        let modelName = null;
+
+        // Override if teller has specific provider
+        if (teller?.ai_provider) {
+             const p = teller.ai_provider.toLowerCase();
+             if (p && p !== 'default') {
+                 provider = p;
+                 if (provider === 'chatgpt') provider = 'openai';
+                 modelName = teller.ai_model;
+             }
+        }
+
         let responseText = "";
 
         if (provider === 'openai') {
             if (!settings.openai_api_key) throw new Error("OpenAI API Key eksik");
             
             const openai = new OpenAI({ apiKey: settings.openai_api_key });
-            const modelName = teller?.ai_model || settings.openai_model || "gpt-4o-mini";
+            const finalModel = modelName || settings.openai_model || "gpt-4o-mini";
 
             const completion = await openai.chat.completions.create({
                 messages: [{ role: "user", content: fullPrompt }],
-                model: modelName,
+                model: finalModel,
             });
 
             responseText = completion.choices[0].message.content || "";
+
+        } else if (provider === 'claude') {
+            if (!settings.claude_api_key) throw new Error("Claude API Key eksik");
+
+            const anthropic = new Anthropic({ apiKey: settings.claude_api_key });
+            const finalModel = modelName || settings.claude_model || "claude-3-opus-20240229";
+
+            const msg = await anthropic.messages.create({
+                model: finalModel,
+                max_tokens: 1024,
+                messages: [{ role: "user", content: fullPrompt }],
+            });
+            // @ts-ignore
+            responseText = msg.content[0].text;
 
         } else {
             // Gemini (Default)
             if (!settings.gemini_api_key) throw new Error("Gemini API Key eksik");
 
             const genAI = new GoogleGenerativeAI(settings.gemini_api_key);
-            const modelName = teller?.ai_model || settings.gemini_model || "gemini-1.5-flash";
+            const finalModel = modelName || settings.gemini_model || "gemini-1.5-flash";
             
             const model = genAI.getGenerativeModel({ 
-                model: modelName,
+                model: finalModel,
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },

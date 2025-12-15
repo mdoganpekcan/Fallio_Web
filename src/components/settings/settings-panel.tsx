@@ -30,6 +30,7 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
     aiSettings ?? {
       id: 1,
       base_prompt: "",
+      active_provider: "gemini",
       claude_api_key: null,
       claude_model: "",
       gemini_api_key: null,
@@ -45,9 +46,10 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
       { label: "claude-3-haiku-20240307", value: "claude-3-haiku-20240307" },
     ],
     gemini: [
-      { label: "gemini-1.5-pro", value: "gemini-1.5-pro" },
       { label: "gemini-1.5-flash", value: "gemini-1.5-flash" },
-      { label: "gemini-pro-vision", value: "gemini-pro-vision" },
+      { label: "gemini-2.0-flash", value: "gemini-2.0-flash" },
+      { label: "gemini-1.5-pro", value: "gemini-1.5-pro" },
+      { label: "gemini-pro", value: "gemini-pro" },
     ],
     openai: [
       { label: "gpt-4o", value: "gpt-4o" },
@@ -343,33 +345,76 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
               </p>
             </div>
 
+            <div className="md:col-span-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 space-y-2">
+              <p className="text-sm font-bold text-yellow-500">Varsayılan Yapay Zeka Sağlayıcısı</p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Tüm projede (aksi belirtilmedikçe) kullanılacak ana yapay zeka servisini seçin.
+              </p>
+              <Select
+                name="active_provider"
+                defaultValue={safeAI.active_provider || "gemini"}
+                options={[
+                  { label: "Google Gemini (Önerilen)", value: "gemini" },
+                  { label: "Anthropic Claude", value: "claude" },
+                  { label: "OpenAI ChatGPT", value: "openai" },
+                ]}
+              />
+            </div>
+
             <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-2">
-              <p className="text-sm font-semibold text-white">Claude (Anthropic)</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-semibold text-white">Claude (Anthropic)</p>
+                {safeAI.active_provider === "claude" && <Badge variant="success">Aktif</Badge>}
+              </div>
               <Input
                 name="claude_api_key"
                 type="password"
                 placeholder="Claude API Key"
                 defaultValue={safeAI.claude_api_key ?? ""}
               />
+              <Select
+                name="claude_model"
+                defaultValue={safeAI.claude_model || providerModels.claude[0]?.value}
+                options={providerModels.claude}
+                placeholder="Model Seçin"
+              />
             </div>
 
             <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-2">
-              <p className="text-sm font-semibold text-white">Gemini (Google)</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-semibold text-white">Gemini (Google)</p>
+                {safeAI.active_provider === "gemini" && <Badge variant="success">Aktif</Badge>}
+              </div>
               <Input
                 name="gemini_api_key"
                 type="password"
                 placeholder="Gemini API Key"
                 defaultValue={safeAI.gemini_api_key ?? ""}
               />
+              <Select
+                name="gemini_model"
+                defaultValue={safeAI.gemini_model || providerModels.gemini[0]?.value}
+                options={providerModels.gemini}
+                placeholder="Model Seçin"
+              />
             </div>
 
             <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-2">
-              <p className="text-sm font-semibold text-white">ChatGPT (OpenAI)</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-semibold text-white">ChatGPT (OpenAI)</p>
+                {safeAI.active_provider === "openai" && <Badge variant="success">Aktif</Badge>}
+              </div>
               <Input
                 name="openai_api_key"
                 type="password"
                 placeholder="OpenAI API Key"
                 defaultValue={safeAI.openai_api_key ?? ""}
+              />
+              <Select
+                name="openai_model"
+                defaultValue={safeAI.openai_model || providerModels.openai[0]?.value}
+                options={providerModels.openai}
+                placeholder="Model Seçin"
               />
             </div>
 

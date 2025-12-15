@@ -105,6 +105,7 @@ export interface Settings {
 export interface AISettings {
   id: number;
   base_prompt: string;
+  active_provider?: "claude" | "gemini" | "openai" | null;
   claude_api_key?: string | null;
   claude_model?: string | null;
   gemini_api_key?: string | null;

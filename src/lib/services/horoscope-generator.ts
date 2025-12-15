@@ -39,22 +39,36 @@ export async function generateHoroscopes(typesToProcess: string[]) {
         console.log("Kullanılabilir Gemini Modelleri:", availableModels);
 
         if (availableModels.length > 0) {
-            // Öncelik sırasına göre model seçimi
+            // Öncelik sırasına göre model seçimi (Hızlı ve ücretsiz modeller öncelikli)
+            // gemini-1.5-flash genellikle günlük 1500 istek limitiyle en cömert olanıdır.
+            // gemini-2.5-flash şu an 20/gün limitli olabilir.
             const preferredModels = [
                 "gemini-1.5-flash",
+                "gemini-2.0-flash",
+                "gemini-flash-latest",
                 "gemini-1.5-pro",
                 "gemini-pro",
-                "gemini-1.0-pro"
+                "gemini-2.5-flash" // Düşük limitli olduğu için sona aldık
             ];
 
             let selectedModel = null;
 
-            // 1. Tam eşleşme veya versiyon içeren en iyi modeli ara
+            // 1. Tam eşleşme ara (Exact Match) - Kararlı sürümleri bulmak için
             for (const pref of preferredModels) {
-                const match = availableModels.find((m: string) => m.includes(pref));
-                if (match) {
-                    selectedModel = match;
+                if (availableModels.includes(pref)) {
+                    selectedModel = pref;
                     break;
+                }
+            }
+
+            // 2. Eğer tam eşleşme yoksa, ismin içinde geçeni ara (Fallback)
+            if (!selectedModel) {
+                for (const pref of preferredModels) {
+                    const match = availableModels.find((m: string) => m.includes(pref));
+                    if (match) {
+                        selectedModel = match;
+                        break;
+                    }
                 }
             }
 
@@ -120,41 +134,62 @@ export async function generateHoroscopes(typesToProcess: string[]) {
             Yorumlar samimi, motive edici ve astrolojik terimlerle süslü olsun. Türkçe olsun.
             `;
 
-      try {
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
+      let retryCount = 0;
+      const maxRetries = 3;
+      let success = false;
 
-        // JSON Temizleme
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const content = JSON.parse(jsonStr);
+      while (!success && retryCount < maxRetries) {
+        try {
+          const result = await model.generateContent(prompt);
+          const response = result.response;
+          const text = response.text();
 
-        // DB'ye Kaydet
-        const { error } = await supabaseAdmin
-          .from('horoscopes')
-          .upsert({
-            sign: sign,
-            scope: type, // daily, weekly, monthly
-            general: content.general,
-            love: content.love,
-            money: content.career, // Şemada career -> money eşleşmesi
-            health: content.health,
-            effective_date: new Date().toISOString().split('T')[0], // Bugünün tarihi
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'sign,scope,effective_date'
-          });
+          // JSON Temizleme
+          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+          const content = JSON.parse(jsonStr);
 
-        if (error) throw error;
+          // DB'ye Kaydet
+          const { error } = await supabaseAdmin
+            .from('horoscopes')
+            .upsert({
+              sign: sign,
+              scope: type, // daily, weekly, monthly
+              general: content.general,
+              love: content.love,
+              money: content.career, // Şemada career -> money eşleşmesi
+              health: content.health,
+              effective_date: new Date().toISOString().split('T')[0], // Bugünün tarihi
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'sign,scope,effective_date'
+            });
 
-        results.push({ sign, type, status: "success" });
+          if (error) throw error;
 
-        // Rate limit için bekle
-        await new Promise(resolve => setTimeout(resolve, 2000));
+          results.push({ sign, type, status: "success" });
+          success = true;
 
-      } catch (err: any) {
-        console.error(`Error processing ${sign} (${type}):`, err);
-        results.push({ sign, type, status: "error", error: err.message });
+          // Rate limit için bekle (Başarılı işlemden sonra)
+          await new Promise(resolve => setTimeout(resolve, 10000)); // 10 saniye bekle
+
+        } catch (err: any) {
+          console.error(`Error processing ${sign} (${type}) - Attempt ${retryCount + 1}:`, err.message);
+          
+          if (err.message?.includes("429") || err.status === 429) {
+             retryCount++;
+             const waitTime = 15000 * retryCount; // 15s, 30s, 45s bekle
+             console.log(`Rate limit aşıldı. ${waitTime / 1000} saniye bekleniyor...`);
+             await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+             // Diğer hatalarda döngüyü kır
+             results.push({ sign, type, status: "error", error: err.message });
+             break;
+          }
+        }
+      }
+      
+      if (!success && retryCount >= maxRetries) {
+          results.push({ sign, type, status: "error", error: "Max retries exceeded due to rate limits." });
       }
     }
   }

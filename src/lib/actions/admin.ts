@@ -333,6 +333,7 @@ export async function upsertAdminUser(formData: FormData) {
 
 export async function upsertAISettings(formData: FormData) {
   const base_prompt = (formData.get("base_prompt") as string) || "";
+  const active_provider = (formData.get("active_provider") as string) || "gemini";
   const claude_api_key = (formData.get("claude_api_key") as string) || null;
   const claude_model = (formData.get("claude_model") as string) || null;
   const gemini_api_key = (formData.get("gemini_api_key") as string) || null;
@@ -346,6 +347,7 @@ export async function upsertAISettings(formData: FormData) {
       {
         id: 1,
         base_prompt,
+        active_provider,
         claude_api_key,
         claude_model,
         gemini_api_key,

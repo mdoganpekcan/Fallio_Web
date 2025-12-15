@@ -16,18 +16,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "AI ayarları bulunamadı." }, { status: 400 });
     }
 
-    // 2. Determine Preferred Provider from Fortune Teller
-    let preferredProvider = "gemini"; // Default
-    let preferredModel = null;
+    // 2. Determine Preferred Provider
+    // Start with Global Default
+    let preferredProvider = settings.active_provider || "gemini";
+    let preferredModel: string | null = null;
 
+    // Check for Fortune Teller Override
     if (fortuneId) {
       const { data: fortune } = await supabaseAdmin.from("fortunes").select("teller_id").eq("id", fortuneId).single();
       if (fortune?.teller_id) {
         const { data: teller } = await supabaseAdmin.from("fortune_tellers").select("ai_provider, ai_model").eq("id", fortune.teller_id).single();
+        
+        // Only override if the teller has a specific provider set and it is not empty/null
         if (teller?.ai_provider) {
-          preferredProvider = teller.ai_provider.toLowerCase();
-          if (preferredProvider === 'chatgpt') preferredProvider = 'openai'; // Map chatgpt to openai
-          preferredModel = teller.ai_model;
+          const tellerProvider = teller.ai_provider.toLowerCase();
+          // If the teller explicitly sets a provider (and it's not some 'default' placeholder if you have one)
+          if (tellerProvider && tellerProvider !== 'default') {
+             preferredProvider = tellerProvider;
+             if (preferredProvider === 'chatgpt') preferredProvider = 'openai'; // Map chatgpt to openai
+             preferredModel = teller.ai_model;
+          }
         }
       }
     }
