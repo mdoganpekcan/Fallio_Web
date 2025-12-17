@@ -113,12 +113,12 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                 render: (item) => (
                   <div className="flex gap-2">
                     {item.status === 'queued' && (
-                      <form action={processNotification}>
+                      <form action={async (formData) => { await processNotification(formData); }}>
                         <input type="hidden" name="id" value={item.id} />
                         <Button size="sm" variant="outline" type="submit">Gönder</Button>
                       </form>
                     )}
-                    <form action={deleteNotification}>
+                    <form action={async (formData) => { await deleteNotification(formData); }}>
                       <input type="hidden" name="id" value={item.id} />
                       <Button size="sm" variant="destructive" type="submit">Sil</Button>
                     </form>

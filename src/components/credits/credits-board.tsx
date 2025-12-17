@@ -63,7 +63,7 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "active",
                   header: "Durum",
                   render: (pkg) => (
-                    <form action={toggleCreditPackageStatus}>
+                    <form action={async (formData) => { await toggleCreditPackageStatus(formData); }}>
                       <input type="hidden" name="id" value={pkg.id} />
                       <input type="hidden" name="active" value={String(pkg.active)} />
                       <button type="submit">
@@ -78,7 +78,7 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "actions",
                   header: "İşlemler",
                   render: (pkg) => (
-                    <form action={deleteCreditPackage}>
+                    <form action={async (formData) => { await deleteCreditPackage(formData); }}>
                       <input type="hidden" name="id" value={pkg.id} />
                       <Button size="sm" variant="destructive" type="submit">Sil</Button>
                     </form>
@@ -129,7 +129,7 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "active",
                   header: "Durum",
                   render: (rule) => (
-                    <form action={toggleEarningRuleStatus}>
+                    <form action={async (formData) => { await toggleEarningRuleStatus(formData); }}>
                       <input type="hidden" name="id" value={rule.id} />
                       <input type="hidden" name="active" value={String(rule.active)} />
                       <button type="submit">
@@ -144,7 +144,7 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "actions",
                   header: "İşlemler",
                   render: (rule) => (
-                    <form action={deleteEarningRule}>
+                    <form action={async (formData) => { await deleteEarningRule(formData); }}>
                       <input type="hidden" name="id" value={rule.id} />
                       <Button size="sm" variant="destructive" type="submit">Sil</Button>
                     </form>
@@ -216,7 +216,7 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
                   key: "actions",
                   header: "İşlemler",
                   render: (sub) => (
-                    <form action={deleteSubscription}>
+                    <form action={async (formData) => { await deleteSubscription(formData); }}>
                       <input type="hidden" name="id" value={sub.id} />
                       <Button size="sm" variant="destructive" type="submit">Sil</Button>
                     </form>
