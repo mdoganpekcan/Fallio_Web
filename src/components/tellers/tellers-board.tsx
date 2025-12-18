@@ -25,6 +25,16 @@ export function TellersBoard({ initialTellers }: Props) {
   const [aiProvider, setAiProvider] = useState<string>("");
   const [aiModel, setAiModel] = useState<string>("");
   const [editing, setEditing] = useState<FortuneTeller | null>(null);
+  const [selectedExpertise, setSelectedExpertise] = useState<string[]>([]);
+
+  const FORTUNE_TYPES = [
+    "Kahve Falı",
+    "Tarot Falı",
+    "El Falı",
+    "Yüz Falı",
+    "Rüya Tabiri",
+    "Aşk Uyumu",
+  ];
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -55,6 +65,7 @@ export function TellersBoard({ initialTellers }: Props) {
 
   useEffect(() => {
     setIsAi(editing?.is_ai ?? false);
+    setSelectedExpertise(editing?.expertise ?? []);
     if (editing?.is_ai) {
       setAiProvider(editing.ai_provider ?? "claude");
       const presetModels = providerModels[editing.ai_provider ?? "claude"];
@@ -95,6 +106,15 @@ export function TellersBoard({ initialTellers }: Props) {
     setIsAi(false);
     setAiProvider("");
     setAiModel("");
+    setSelectedExpertise([]);
+  };
+
+  const toggleExpertise = (type: string) => {
+    setSelectedExpertise((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : [...prev, type]
+    );
   };
 
   const handleProviderChange = (value: string) => {
@@ -301,12 +321,22 @@ export function TellersBoard({ initialTellers }: Props) {
               placeholder="Avatar URL"
               defaultValue={editing?.avatar_url ?? ""}
             />
-            <Input
-              name="expertise"
-              placeholder="Uzmanlıklar (örn: Tarot, Astroloji)"
-              defaultValue={editing?.expertise?.join(", ") ?? ""}
-              className="md:col-span-2"
-            />
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-sm font-medium text-[var(--muted-foreground)]">Uzmanlık Alanları</label>
+              <div className="grid grid-cols-2 gap-2">
+                {FORTUNE_TYPES.map((type) => (
+                  <label key={type} className="flex items-center gap-2 text-sm border p-2 rounded-md cursor-pointer hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={selectedExpertise.includes(type)}
+                      onChange={() => toggleExpertise(type)}
+                    />
+                    {type}
+                  </label>
+                ))}
+              </div>
+              <input type="hidden" name="expertise" value={selectedExpertise.join(",")} />
+            </div>
             <Input
               name="bio"
               placeholder="Kısa bio"

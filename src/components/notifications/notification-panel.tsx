@@ -11,10 +11,28 @@ import { Select } from "../ui/select";
 import { Button } from "../ui/button";
 import { Table } from "../tables/table";
 import { Badge } from "../ui/badge";
+import { Copy } from "lucide-react";
 
 export function NotificationPanel({ notifications }: { notifications: NotificationItem[] }) {
   const [tab, setTab] = useState<string>("bulk");
   const [pending, startTransition] = useTransition();
+
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState("");
+  const [segment, setSegment] = useState("all");
+
+  const handleCopy = (item: NotificationItem) => {
+    setTitle(item.title);
+    setMessage(item.message);
+    if (item.segment === 'single') {
+        setTab('direct');
+        setUserId(item.user_id ?? "");
+    } else {
+        setTab('bulk');
+        setSegment(item.segment);
+    }
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[420px,1fr]">
@@ -41,15 +59,28 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
             }
             className="space-y-3"
           >
-            <Input name="title" placeholder="Başlık" required />
+            <Input 
+              name="title" 
+              placeholder="Başlık" 
+              required 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+            />
             <Textarea
               name="message"
               placeholder="Bildirim mesajınızı buraya yazın..."
               rows={4}
               required
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
             />
             {tab === "direct" ? (
-              <Input name="user_id" placeholder="Tek kullanıcı ID" />
+              <Input 
+                name="user_id" 
+                placeholder="Tek kullanıcı ID" 
+                value={userId} 
+                onChange={(e) => setUserId(e.target.value)} 
+              />
             ) : (
               <Select
                 name="segment"
@@ -58,6 +89,8 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                   { label: "Premium", value: "premium" },
                   { label: "Yeni Kullanıcılar", value: "new" },
                 ]}
+                value={segment}
+                onChange={(e) => setSegment(e.target.value)}
               />
             )}
             <label className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
@@ -118,10 +151,9 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                         <Button size="sm" variant="outline" type="submit">Gönder</Button>
                       </form>
                     )}
-                    <form action={async (formData) => { await deleteNotification(formData); }}>
-                      <input type="hidden" name="id" value={item.id} />
-                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
-                    </form>
+                    <Button size="sm" variant="outline" onClick={() => handleCopy(item)}>
+                      <Copy size={16} className="mr-1" /> Kopyala
+                    </Button>
                   </div>
                 )
               }

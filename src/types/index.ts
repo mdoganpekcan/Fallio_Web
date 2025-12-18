@@ -88,7 +88,9 @@ export interface AdminUser {
 export interface NotificationItem {
   id: string;
   title: string;
+  message: string;
   segment: string;
+  user_id?: string | null;
   status: "sent" | "error" | "queued";
   created_at?: string;
 }
