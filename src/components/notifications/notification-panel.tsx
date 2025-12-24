@@ -146,10 +146,16 @@ export function NotificationPanel({ notifications }: { notifications: Notificati
                 render: (item) => (
                   <div className="flex gap-2">
                     {item.status === 'queued' && (
-                      <form action={async (formData) => { await processNotification(formData); }}>
-                        <input type="hidden" name="id" value={item.id} />
-                        <Button size="sm" variant="outline" type="submit">Gönder</Button>
-                      </form>
+                      <>
+                        <form action={async (formData) => { await processNotification(formData); }}>
+                          <input type="hidden" name="id" value={item.id} />
+                          <Button size="sm" variant="outline" type="submit">Gönder</Button>
+                        </form>
+                        <form action={async (formData) => { await deleteNotification(formData); }}>
+                          <input type="hidden" name="id" value={item.id} />
+                          <Button size="sm" variant="destructive" type="submit">Sil</Button>
+                        </form>
+                      </>
                     )}
                     <Button size="sm" variant="outline" onClick={() => handleCopy(item)}>
                       <Copy size={16} className="mr-1" /> Kopyala
