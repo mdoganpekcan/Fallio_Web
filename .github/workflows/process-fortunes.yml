@@ -1,0 +1,17 @@
+name: Process Fortunes Cron
+
+on:
+  schedule:
+    # Her 5 dakikada bir çalışır
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Manuel tetikleme için
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Process Fortunes API
+        run: |
+          curl -X GET https://fallio-web.vercel.app/api/cron/process-fortunes \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"
