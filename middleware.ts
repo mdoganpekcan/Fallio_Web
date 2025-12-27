@@ -83,39 +83,61 @@ export async function middleware(req: NextRequest) {
   // Role-based access control
   if (user && adminUser) {
     const path = req.nextUrl.pathname;
-    
-    // Fortune Teller Restrictions
+
+    // 1. ADMIN - Tam Erişim
+    if (adminUser.role === 'admin') {
+      // Admin her yere girebilir, login sayfasındaysa dashboard'a yönlendir
+      if (isLoginPage) {
+        const redirectUrl = req.nextUrl.clone();
+        redirectUrl.pathname = "/admin/dashboard";
+        const redirectRes = NextResponse.redirect(redirectUrl);
+        res.cookies.getAll().forEach(cookie => redirectRes.cookies.set(cookie));
+        return redirectRes;
+      }
+      return res;
+    }
+
+    // 2. FORTUNE TELLER - Kısıtlı Erişim
     if (adminUser.role === 'fortune_teller') {
       const allowedPaths = [
         '/admin/fortunes',
         '/admin/horoscopes',
         '/admin/login',
-        '/admin/dashboard'
+        '/admin/dashboard',
+        '/admin/profile' // Profil düzenleme ihtiyacı olabilir
       ];
-      
-      // Check if path starts with any allowed path
+
       const isAllowed = allowedPaths.some(p => path.startsWith(p));
-      
-      if (!isAllowed && !path.includes('.')) { 
-         const redirectUrl = req.nextUrl.clone();
-         redirectUrl.pathname = "/admin/fortunes";
-         const redirectRes = NextResponse.redirect(redirectUrl);
-         res.cookies.getAll().forEach(cookie => {
-            redirectRes.cookies.set(cookie);
-         });
-         return redirectRes;
+
+      if (!isAllowed && !path.includes('.')) {
+        const redirectUrl = req.nextUrl.clone();
+        redirectUrl.pathname = "/admin/fortunes";
+        const redirectRes = NextResponse.redirect(redirectUrl);
+        res.cookies.getAll().forEach(cookie => redirectRes.cookies.set(cookie));
+        return redirectRes;
       }
+
+      if (isLoginPage) {
+        const redirectUrl = req.nextUrl.clone();
+        redirectUrl.pathname = "/admin/fortunes"; // Falcıları direkt iş listesine atalım
+        const redirectRes = NextResponse.redirect(redirectUrl);
+        res.cookies.getAll().forEach(cookie => redirectRes.cookies.set(cookie));
+        return redirectRes;
+      }
+
+      return res;
     }
 
-    if (isLoginPage) {
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = "/admin/dashboard";
-      const redirectRes = NextResponse.redirect(redirectUrl);
-      res.cookies.getAll().forEach(cookie => {
-        redirectRes.cookies.set(cookie);
-      });
-      return redirectRes;
-    }
+    // 3. Diğer Roller (Yetkisiz)
+    // Rolü admin veya fortune_teller değilse, admin paneline giremez.
+    try { await supabase.auth.signOut(); } catch (e) { }
+
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = "/admin/login";
+    redirectUrl.searchParams.set("error", "unauthorized_role");
+    const redirectRes = NextResponse.redirect(redirectUrl);
+    res.cookies.getAll().forEach(cookie => redirectRes.cookies.set(cookie));
+    return redirectRes;
   }
 
   return res;
