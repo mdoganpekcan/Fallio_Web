@@ -66,12 +66,15 @@ export async function GET(req: Request) {
     for (const fortune of fortunes) {
       try {
         // Prompt Hazırlığı
+        const meta = fortune.metadata as any || {};
+        const language = meta.language || 'tr'; // Default to Turkish if not specified
+        const languageInstruction = language === 'en' ? "Please provide the response in English." : "Lütfen yanıtı Türkçe ver.";
+
         let prompt = settings.base_prompt || "Sen deneyimli bir falcısın. Kullanıcının falını yorumla.";
         prompt = prompt.replace("{{fortune_type}}", fortune.type);
 
         let extraDetails = "";
         if (fortune.metadata) {
-          const meta = fortune.metadata as any;
           if (meta.selected_cards) extraDetails += `\n- Seçilen Kartlar: ${Array.isArray(meta.selected_cards) ? meta.selected_cards.join(", ") : meta.selected_cards}`;
           if (meta.selected_color) extraDetails += `\n- Seçilen Renk: ${meta.selected_color}`;
           if (meta.category) extraDetails += `\n- Kategori: ${meta.category}`;
@@ -88,7 +91,7 @@ export async function GET(req: Request) {
         - Kullanıcı Notu: ${fortune.user_note || "Yok"}${extraDetails}
         `;
 
-        const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
+        const fullPrompt = `${prompt}\n\n${userContext}\n\n${languageInstruction}\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
 
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
 

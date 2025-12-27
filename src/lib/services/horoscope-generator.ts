@@ -16,7 +16,7 @@ export async function generateHoroscopes(typesToProcess: string[]) {
   }
 
   const apiKey = settings.gemini_api_key.trim();
-  
+
   // Model ismini temizle
   let rawModelName = settings.gemini_model || "gemini-1.5-flash";
   const modelName = rawModelName.replace("models/", "");
@@ -33,102 +33,108 @@ export async function generateHoroscopes(typesToProcess: string[]) {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ],
     generationConfig: {
-        responseMimeType: "application/json"
+      responseMimeType: "application/json"
     }
   });
 
-  // 2. Döngü: Sadece TİP (Daily/Weekly) bazında döner, Burç bazında dönmez!
+  // 2. Döngü: Sadece TİP (Daily/Weekly) bazında döner
+  const SUPPORTED_LANGUAGES = ['tr', 'en'];
+
   for (const type of typesToProcess) {
-    console.log(`[Batch] Processing horoscopes for type: ${type}`);
+    for (const lang of SUPPORTED_LANGUAGES) {
+      console.log(`[Batch] Processing horoscopes for type: ${type}, language: ${lang}`);
+
+      const isTr = lang === 'tr';
+      const periodText = type === 'daily' ? (isTr ? 'Bugün' : 'Today') : type === 'weekly' ? (isTr ? 'Bu Hafta' : 'This Week') : (isTr ? 'Bu Ay' : 'This Month');
+      const langInstruction = isTr ? "Yanıtlar Türkçe olsun." : "Responses MUST be in English.";
+
+      const prompt = `
+          Sen profesyonel bir astrologsun.
+          Dönem: ${periodText}
+          Dil: ${lang}
+          
+          Aşağıdaki 12 burç için tek seferde yorum üret:
+          ${ZODIAC_SIGNS.join(", ")}
     
-    // Tek bir prompt ile HEPSİNİ istiyoruz
-    const prompt = `
-      Sen profesyonel bir astrologsun.
-      Dönem: ${type === 'daily' ? 'Bugün' : type === 'weekly' ? 'Bu Hafta' : 'Bu Ay'}
-      
-      Aşağıdaki 12 burç için tek seferde yorum üret:
-      ${ZODIAC_SIGNS.join(", ")}
+          Lütfen yanıtı SADECE geçerli bir JSON formatında ver.
+          Yanıt şu yapıda bir Array (Liste) olmalı:
+          [
+            {
+              "sign": "koc",
+              "general": "...",
+              "love": "...",
+              "career": "...",
+              "health": "..."
+            },
+            ... diğer burçlar
+          ]
+          
+          Kurallar:
+          1. "sign" alanı kesinlikle şu listeden biri olmalı (küçük harf, Türkçe karakter yok): koc, boga, ikizler, yengec, aslan, basak, terazi, akrep, yay, oglak, kova, balik.
+          2. Yorumlar samimi, motive edici ve ${langInstruction}
+          3. "career" alanı iş ve para durumunu kapsamalıdır.
+        `;
 
-      Lütfen yanıtı SADECE geçerli bir JSON formatında ver.
-      Yanıt şu yapıda bir Array (Liste) olmalı:
-      [
-        {
-          "sign": "koc",
-          "general": "...",
-          "love": "...",
-          "career": "...",
-          "health": "..."
-        },
-        ... diğer burçlar
-      ]
-      
-      Kurallar:
-      1. "sign" alanı kesinlikle şu listeden biri olmalı (küçük harf, Türkçe karakter yok): koc, boga, ikizler, yengec, aslan, basak, terazi, akrep, yay, oglak, kova, balik.
-      2. Yorumlar samimi, motive edici ve Türkçe olsun. 
-      3. "career" alanı iş ve para durumunu kapsamalıdır.
-    `;
-
-    try {
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
-
-      // JSON Temizleme (Markdown blocklarını temizle)
-      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      let horoscopesBatch;
-      
       try {
-        horoscopesBatch = JSON.parse(jsonStr);
-      } catch (e) {
-        console.error("JSON Parse Hatası:", text);
-        throw new Error("AI yanıtı JSON formatında değildi.");
-      }
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
 
-      if (!Array.isArray(horoscopesBatch)) {
-          throw new Error("AI yanıtı bir dizi (array) değil.");
-      }
+        // JSON Temizleme
+        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        let horoscopesBatch;
 
-      // 3. Gelen toplu veriyi veritabanına kaydet
-      for (const item of horoscopesBatch) {
-        // Sign isminin doğruluğunu kontrol et
-        const signKey = item.sign?.toLowerCase();
-        
-        if (!ZODIAC_SIGNS.includes(signKey)) {
-            console.warn(`Geçersiz burç ismi atlandı: ${signKey}`);
+        try {
+          horoscopesBatch = JSON.parse(jsonStr);
+        } catch (e) {
+          console.error("JSON Parse Hatası:", text);
+          continue; // Bu hatalı batch'i geç, diğer dile/tipe devam et
+        }
+
+        if (!Array.isArray(horoscopesBatch)) {
+          console.error("AI yanıtı dizi değil");
+          continue;
+        }
+
+        // 3. Gelen toplu veriyi veritabanına kaydet
+        for (const item of horoscopesBatch) {
+          const signKey = item.sign?.toLowerCase();
+
+          if (!ZODIAC_SIGNS.includes(signKey)) {
             continue;
-        }
-        
-        const { error } = await supabaseAdmin
-          .from('horoscopes')
-          .upsert({
-            sign: signKey,
-            scope: type,
-            general: item.general,
-            love: item.love,
-            money: item.career, // Şemada career -> money eşleşmesi
-            health: item.health,
-            effective_date: new Date().toISOString().split('T')[0],
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'sign,scope,effective_date'
-          });
+          }
 
-        if (error) {
-            console.error(`DB Error for ${signKey}:`, error.message);
-            results.push({ sign: signKey, type, status: "error", error: error.message });
-        } else {
-            results.push({ sign: signKey, type, status: "success" });
+          const { error } = await supabaseAdmin
+            .from('horoscopes')
+            .upsert({
+              sign: signKey,
+              scope: type,
+              language: lang, // Yeni kolon
+              general: item.general,
+              love: item.love,
+              money: item.career,
+              health: item.health,
+              effective_date: new Date().toISOString().split('T')[0],
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'sign,scope,effective_date,language' // Güncellenmiş Constraint
+            });
+
+          if (error) {
+            console.error(`DB Error for ${signKey} (${lang}):`, error.message);
+            results.push({ sign: signKey, type, lang, status: "error", error: error.message });
+          } else {
+            results.push({ sign: signKey, type, lang, status: "success" });
+          }
         }
+
+      } catch (err: any) {
+        console.error(`Batch Error for ${type}/${lang}:`, err.message);
+        results.push({ type, lang, status: "fatal_error", error: err.message });
       }
 
-    } catch (err: any) {
-      console.error(`Batch Error for ${type}:`, err.message);
-      results.push({ type, status: "fatal_error", error: err.message });
-    }
-    
-    // Tipler arasında (Daily bitti, Weekly'e geçerken) biraz bekle
-    if (typesToProcess.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      // Rate limit koruması
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
 
