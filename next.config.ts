@@ -34,7 +34,7 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   org: "fallio",
   project: "fallio-web",
-}, {
+
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
