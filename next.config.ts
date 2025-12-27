@@ -2,9 +2,6 @@ import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
   /* config options here */
   outputFileTracingRoot: path.join(__dirname),
   images: {
