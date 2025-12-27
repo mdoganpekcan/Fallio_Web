@@ -126,10 +126,16 @@ export async function fetchUsers({
   if (status && status !== "all") query = query.eq("status", status);
   if (zodiac && zodiac !== "all") query = query.eq("zodiac_sign", zodiac);
   const { data, count } = await query.range(from, to);
+
+  // Fetch admins to map roles
+  const { data: admins } = await supabaseAdmin.from("admin_users").select("email, role");
+  const adminMap = new Map(admins?.map(a => [a.email, a.role]));
+
   const mapped =
     data?.map((u) => ({
       ...(u as any),
       credits: (u as any).wallet?.credits ?? 0,
+      admin_role: adminMap.get((u as any).email) ?? null,
     })) ?? [];
   return { data: mapped as User[], count: count ?? 0 };
 }

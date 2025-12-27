@@ -10,7 +10,7 @@ export async function upsertAppConfig(formData: FormData) {
   const daily_free_fortune_limit = Number(formData.get("daily_free_fortune_limit") || 0);
   const maintenance_mode = formData.get("maintenance_mode") === "on";
   const contact_email = formData.get("contact_email") as string;
-  
+
   // Fortune costs (JSON)
   const fortune_costs: Record<string, number> = {};
   const types = ["coffee", "tarot", "palm", "dream", "love", "card", "color"];
@@ -106,12 +106,12 @@ export async function deleteTeller(formData: FormData) {
 export async function toggleTellerStatus(formData: FormData) {
   const id = formData.get("id") as string;
   const isActive = formData.get("is_active") === "true";
-  
+
   const { error } = await supabaseAdmin
     .from("fortune_tellers")
     .update({ is_active: isActive })
     .eq("id", id);
-    
+
   if (error) return { error: error.message };
   revalidatePath("/admin/tellers");
   return { success: true };
@@ -174,15 +174,15 @@ export async function updateUserStatus(formData: FormData) {
 
 export async function deleteUser(formData: FormData) {
   const id = formData.get("id") as string;
-  
+
   // Delete from auth.users (triggers cascade to public.users)
   const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-  
+
   if (error) {
     console.error("Delete User Error:", error);
     return { error: error.message };
   }
-  
+
   revalidatePath("/admin/users");
   return { success: true };
 }
@@ -271,7 +271,7 @@ export async function sendNotification(formData: FormData) {
   if (error) return { error: error.message };
 
   if (shouldSendNow && segment === 'single' && user_id) {
-      await sendPushNotification(user_id, title, message);
+    await sendPushNotification(user_id, title, message);
   }
 
   revalidatePath("/admin/notifications");
@@ -288,19 +288,19 @@ export async function deleteNotification(formData: FormData) {
 
 export async function processNotification(formData: FormData) {
   const id = formData.get("id") as string;
-  
+
   const { data: notification, error: fetchError } = await supabaseAdmin
     .from("notifications")
     .select("*")
     .eq("id", id)
     .single();
-    
+
   if (fetchError || !notification) return { error: "Bildirim bulunamadı." };
-  
+
   if (notification.segment === 'single' && notification.user_id) {
-     await sendPushNotification(notification.user_id, notification.title, notification.message);
+    await sendPushNotification(notification.user_id, notification.title, notification.message);
   }
-  
+
   const { error } = await supabaseAdmin
     .from("notifications")
     .update({ status: "sent", sent_at: new Date().toISOString() })
@@ -381,25 +381,25 @@ export async function upsertAdminUser(formData: FormData) {
 
   // 2. Upsert into admin_users
   const payload = { auth_user_id: authUserId, email, role, display_name };
-  
+
   // If we have an ID (admin_users.id), update by that. 
   // Otherwise, we might want to upsert by auth_user_id or email to avoid duplicates.
   // But the table likely has a unique constraint on auth_user_id or email.
-  
+
   let error;
   if (id) {
-     const { error: updateError } = await supabaseAdmin.from("admin_users").update(payload).eq("id", id);
-     error = updateError;
+    const { error: updateError } = await supabaseAdmin.from("admin_users").update(payload).eq("id", id);
+    error = updateError;
   } else {
-     // Check if admin record exists for this auth user
-     const { data: existing } = await supabaseAdmin.from("admin_users").select("id").eq("auth_user_id", authUserId).maybeSingle();
-     if (existing) {
-        const { error: updateError } = await supabaseAdmin.from("admin_users").update(payload).eq("id", existing.id);
-        error = updateError;
-     } else {
-        const { error: insertError } = await supabaseAdmin.from("admin_users").insert(payload);
-        error = insertError;
-     }
+    // Check if admin record exists for this auth user
+    const { data: existing } = await supabaseAdmin.from("admin_users").select("id").eq("auth_user_id", authUserId).maybeSingle();
+    if (existing) {
+      const { error: updateError } = await supabaseAdmin.from("admin_users").update(payload).eq("id", existing.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabaseAdmin.from("admin_users").insert(payload);
+      error = insertError;
+    }
   }
 
   if (error) return { error: error.message };
@@ -481,5 +481,52 @@ export async function resolveFortune(formData: FormData) {
 
   revalidatePath("/admin/fortunes");
   revalidatePath(`/admin/fortunes/${fortuneId}`);
+  return { success: true };
+}
+
+export async function setUserRole(formData: FormData) {
+  const email = formData.get("email") as string;
+  const role = formData.get("role") as string; // 'none' means remove admin
+  const userId = formData.get("userId") as string; // public.users.id
+
+  // 1. Get Authentication ID (we need auth_user_id for admin_users)
+  // We can look it up from public.users table if we have local ID, 
+  // OR we can just use the public user ID if it Matches Auth ID (which it does in our schema)
+  // public.users.id IS auth.users.id in our schema.
+  const authUserId = userId;
+
+  if (role === 'none') {
+    // Revoke Admin
+    const { error } = await supabaseAdmin.from("admin_users").delete().eq("email", email);
+    if (error) return { error: error.message };
+  } else {
+    // Grant/Update Admin
+    // Check if user exists in Auth first (Double check)
+    // Upsert into admin_users
+    const payload = {
+      auth_user_id: authUserId,
+      email: email,
+      role: role,
+      display_name: email.split('@')[0] // Fallback name
+    };
+
+    // We try to upsert by email or auth_user_id
+    // But admin_users primary key is ID. We should check if it exists first to get ID for upsert, 
+    // or rely on unique constraints (email or auth_user_id).
+    // Our schema has unique email.
+
+    // Let's use ON CONFLICT (email) if possible, or manual check.
+    const { data: existing } = await supabaseAdmin.from("admin_users").select("id").eq("email", email).maybeSingle();
+
+    if (existing) {
+      const { error } = await supabaseAdmin.from("admin_users").update({ role }).eq("id", existing.id);
+      if (error) return { error: error.message };
+    } else {
+      const { error } = await supabaseAdmin.from("admin_users").insert(payload);
+      if (error) return { error: error.message };
+    }
+  }
+
+  revalidatePath("/admin/users");
   return { success: true };
 }

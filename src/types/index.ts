@@ -15,6 +15,7 @@ export interface User {
   status: UserStatus;
   city?: string | null;
   created_at?: string | null;
+  admin_role?: AdminRole | null;
 }
 
 export interface FortuneTeller {
