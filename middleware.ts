@@ -54,12 +54,19 @@ export async function middleware(req: NextRequest) {
 
   let adminUser: { id: string; role: string } | null = null;
   if (user) {
-    const { data } = await supabase
+    console.log("--- Middleware: Checking Admin Role ---");
+    const { data, error: dbError } = await supabase
       .from("admin_users")
       .select("id, role")
       .eq("auth_user_id", user.id)
       .maybeSingle();
+
+    if (dbError) {
+      console.error("❌ Middleware Veritabanı Hatası:", dbError);
+    }
+
     adminUser = data as { id: string; role: string } | null;
+    console.log("Admin User Data:", adminUser);
   }
 
   if (user && !adminUser) {
