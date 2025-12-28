@@ -136,7 +136,6 @@ export async function middleware(req: NextRequest) {
     }
 
     // 3. Diğer Roller (Yetkisiz)
-    // Rolü admin veya fortune_teller değilse, admin paneline giremez.
     try { await supabase.auth.signOut(); } catch (e) { }
 
     const redirectUrl = req.nextUrl.clone();

@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
     // 1. Fetch AI Settings
     const { data: settings } = await supabaseAdmin.from("ai_settings").select("*").single();
-    
+
     if (!settings) {
       return NextResponse.json({ error: "AI ayarları bulunamadı." }, { status: 400 });
     }
@@ -26,15 +26,15 @@ export async function POST(req: Request) {
       const { data: fortune } = await supabaseAdmin.from("fortunes").select("teller_id").eq("id", fortuneId).single();
       if (fortune?.teller_id) {
         const { data: teller } = await supabaseAdmin.from("fortune_tellers").select("ai_provider, ai_model").eq("id", fortune.teller_id).single();
-        
+
         // Only override if the teller has a specific provider set and it is not empty/null
         if (teller?.ai_provider) {
           const tellerProvider = teller.ai_provider.toLowerCase();
           // If the teller explicitly sets a provider (and it's not some 'default' placeholder if you have one)
           if (tellerProvider && tellerProvider !== 'default') {
-             preferredProvider = tellerProvider;
-             if (preferredProvider === 'chatgpt') preferredProvider = 'openai'; // Map chatgpt to openai
-             preferredModel = teller.ai_model;
+            preferredProvider = tellerProvider;
+            if (preferredProvider === 'chatgpt') preferredProvider = 'openai'; // Map chatgpt to openai
+            preferredModel = teller.ai_model;
           }
         }
       }
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     // 3. Construct Prompt
     let prompt = settings.base_prompt || "Sen deneyimli bir falcısın. Kullanıcının falını yorumla.";
     prompt = prompt.replace("{{fortune_type}}", fortuneType);
-    
+
     let extraDetails = "";
     if (metadata) {
       if (metadata.selected_cards) extraDetails += `\n- Seçilen Kartlar: ${Array.isArray(metadata.selected_cards) ? metadata.selected_cards.join(", ") : metadata.selected_cards}`;
@@ -61,7 +61,44 @@ export async function POST(req: Request) {
     - Kullanıcı Notu: ${userNote || "Yok"}${extraDetails}
     `;
 
-    const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap.`;
+    // 4. Fetch Images if exists
+    let imageParts: any[] = [];
+    if (fortuneId) {
+      const { data: images } = await supabaseAdmin
+        .from("fortune_images")
+        .select("url")
+        .eq("fortune_id", fortuneId);
+
+      if (images && images.length > 0) {
+        for (const img of images) {
+          try {
+            // URL format: .../storage/v1/object/public/fortune-images/folder/file.jpg
+            const urlParts = img.url.split("/fortune-images/");
+            if (urlParts.length > 1) {
+              const filePath = urlParts[1];
+              const { data, error } = await supabaseAdmin.storage
+                .from("fortune-images")
+                .download(filePath);
+
+              if (data) {
+                const buffer = Buffer.from(await data.arrayBuffer());
+                const base64 = buffer.toString("base64");
+                imageParts.push({
+                  inlineData: {
+                    data: base64,
+                    mimeType: "image/jpeg",
+                  },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Image download error:", e);
+          }
+        }
+      }
+    }
+
+    const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. ${imageParts.length > 0 ? "Sana gönderdiğim resimleri detaylıca analiz et ve yorumuna dahil et." : ""}`;
 
     let responseText = "";
 
@@ -90,15 +127,15 @@ export async function POST(req: Request) {
 
             // Prioritize 1.5 Pro and Flash models
             const prioritized = availableModels.sort((a: string, b: string) => {
-               const getScore = (name: string) => {
-                 if (name.includes("1.5-pro")) return 3;
-                 if (name.includes("1.5-flash")) return 2;
-                 if (name.includes("2.0")) return 1; // Experimental but new
-                 return 0;
-               };
-               return getScore(b) - getScore(a);
+              const getScore = (name: string) => {
+                if (name.includes("1.5-pro")) return 3;
+                if (name.includes("1.5-flash")) return 2;
+                if (name.includes("2.0")) return 1; // Experimental but new
+                return 0;
+              };
+              return getScore(b) - getScore(a);
             });
-            
+
             modelsToTry = prioritized;
             // console.log("Fetched dynamic Gemini models:", modelsToTry);
           }
@@ -110,10 +147,10 @@ export async function POST(req: Request) {
       // 2. Fallback list if dynamic fetch fails
       if (modelsToTry.length === 0) {
         const fallbacks = [
-          "gemini-1.5-pro", 
-          "gemini-1.5-flash", 
-          "gemini-2.0-flash-exp", 
-          "gemini-1.5-pro-latest", 
+          "gemini-1.5-pro",
+          "gemini-1.5-flash",
+          "gemini-2.0-flash-exp",
+          "gemini-1.5-pro-latest",
           "gemini-1.0-pro"
         ];
         fallbacks.forEach(m => {
@@ -124,15 +161,15 @@ export async function POST(req: Request) {
       // 3. Add preferred model to top
       let primaryModel = (preferredProvider === 'gemini' && preferredModel) ? preferredModel : settings.gemini_model;
       if (primaryModel) {
-         // Remove if exists to avoid duplicates, then unshift
-         modelsToTry = modelsToTry.filter(m => m !== primaryModel);
-         modelsToTry.unshift(primaryModel);
+        // Remove if exists to avoid duplicates, then unshift
+        modelsToTry = modelsToTry.filter(m => m !== primaryModel);
+        modelsToTry.unshift(primaryModel);
       }
 
       for (const modelName of modelsToTry) {
         try {
           const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({ 
+          const model = genAI.getGenerativeModel({
             model: modelName,
             safetySettings: [
               { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -141,15 +178,16 @@ export async function POST(req: Request) {
               { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             ]
           });
-          const result = await model.generateContent(fullPrompt);
+
+          const result = await model.generateContent([fullPrompt, ...imageParts]);
           const text = result.response.text();
           if (text) return text;
         } catch (e: any) {
           console.error(`Gemini Error (${modelName}):`, e.message);
-          
+
           // Only push error if it's the last model we tried
           if (modelName === modelsToTry[modelsToTry.length - 1]) {
-             errors.push(`Gemini Error (Last attempt ${modelName}): ${e.message}`);
+            errors.push(`Gemini Error (Last attempt ${modelName}): ${e.message}`);
           }
         }
       }
@@ -164,8 +202,20 @@ export async function POST(req: Request) {
       try {
         const openai = new OpenAI({ apiKey: settings.openai_api_key });
         const modelName = (preferredProvider === 'openai' && preferredModel) ? preferredModel : (settings.openai_model || "gpt-4o");
+
+        const content: any[] = [{ type: "text", text: fullPrompt }];
+        imageParts.forEach(part => {
+          content.push({
+            type: "image_url",
+            image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+          });
+        });
+
         const completion = await openai.chat.completions.create({
-          messages: [{ role: "system", content: "Sen bir falcısın." }, { role: "user", content: fullPrompt }],
+          messages: [
+            { role: "system", content: "Sen bir falcısın." },
+            { role: "user", content: content as any }
+          ],
           model: modelName,
         });
         return completion.choices[0].message.content || "";
@@ -200,7 +250,7 @@ export async function POST(req: Request) {
 
     // 4. Execution Logic
     // Priority: Preferred -> Gemini -> OpenAI -> Claude
-    
+
     // Try preferred first
     if (preferredProvider === 'gemini') responseText = await tryGemini() || "";
     else if (preferredProvider === 'openai') responseText = await tryOpenAI() || "";
@@ -218,8 +268,8 @@ export async function POST(req: Request) {
     }
 
     if (!responseText) {
-      return NextResponse.json({ 
-        error: "Hiçbir AI sağlayıcısı yanıt vermedi. Detaylar: " + errors.join(", ") 
+      return NextResponse.json({
+        error: "Hiçbir AI sağlayıcısı yanıt vermedi. Detaylar: " + errors.join(", ")
       }, { status: 500 });
     }
 
