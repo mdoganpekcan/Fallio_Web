@@ -18,31 +18,45 @@ const validRoles = ["admin", "moderator", "fortune_teller"];
 let role = "admin";
 let name = "Admin User";
 
+// Argument handling improvements
 if (args[2]) {
-  if (validRoles.includes(args[2])) {
-    role = args[2];
+  if (validRoles.includes(args[2].toLowerCase())) {
+    role = args[2].toLowerCase();
     if (args[3]) name = args[3];
   } else {
     name = args[2];
+    if (args[3] && validRoles.includes(args[3].toLowerCase())) {
+      role = args[3].toLowerCase();
+    }
   }
 }
 
-// 1. Load Environment Variables from .env.local
-const envPath = path.resolve(__dirname, '../.env.local');
-console.log(`Loading env from: ${envPath}`);
+// 1. Robust Env Loading
+const envPaths = [
+  path.resolve(__dirname, '../.env.local'),
+  path.resolve(__dirname, '../.env')
+];
 
-if (fs.existsSync(envPath)) {
-  const envConfig = fs.readFileSync(envPath, 'utf8');
-  envConfig.split('\n').forEach(line => {
-    const match = line.match(/^([^=]+)=(.*)$/);
-    if (match) {
-      const key = match[1].trim();
-      const value = match[2].trim().replace(/^["']|["']$/g, ''); // Remove quotes
-      process.env[key] = value;
-    }
-  });
-} else {
-  console.error("Error: .env.local file not found!");
+let envLoaded = false;
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    console.log(`Loading env from: ${p}`);
+    const envConfig = fs.readFileSync(p, 'utf8');
+    envConfig.split('\n').forEach(line => {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/^["']|["']$/g, '');
+        process.env[key] = value;
+      }
+    });
+    envLoaded = true;
+    break;
+  }
+}
+
+if (!envLoaded) {
+  console.error("Error: .env.local or .env file not found!");
   process.exit(1);
 }
 
@@ -50,95 +64,68 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
-  console.error("Error: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local");
+  console.error("Error: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
 }
 
-// 2. Create Supabase Admin Client
+// 2. Client Setup
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
+  auth: { autoRefreshToken: false, persistSession: false },
 });
 
 async function createAdmin() {
-  console.log(`Creating/Updating admin user: ${email}`);
+  console.log(`\n--- Fallio Admin Creator ---`);
+  console.log(`Email: ${email}`);
+  console.log(`Role:  ${role}`);
+  console.log(`Name:  ${name}\n`);
 
-  // 3. Check if user exists in Auth
+  // 3. Auth Operations
   const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-  
-  if (listError) {
-    console.error("Error listing users:", listError);
-    return;
-  }
-  
-  let userId = users?.find(u => u.email === email)?.id;
+  if (listError) return console.error("!! Error listing users:", listError.message);
+
+  let userId = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
   if (!userId) {
-    console.log("User not found in Auth, creating...");
+    console.log("-> User not found in Auth, creating new account...");
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: name }
+      user_metadata: { full_name: name, role: role }
     });
 
-    if (createError) {
-      console.error("Error creating user:", createError);
-      return;
-    }
+    if (createError) return console.error("!! Error creating user:", createError.message);
     userId = newUser.user.id;
-    console.log("User created with ID:", userId);
+    console.log("✅ Auth user created successfully.");
   } else {
-    console.log("User already exists with ID:", userId);
-    console.log("Updating password...");
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
-    if (updateError) {
-        console.error("Error updating password:", updateError);
-    } else {
-        console.log("Password updated successfully.");
-    }
+    console.log("-> User exists in Auth. Synchronizing password...");
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password,
+      user_metadata: { full_name: name, role: role }
+    });
+    if (updateError) console.error("!! Password update failed:", updateError.message);
+    else console.log("✅ Password updated.");
   }
 
-  // 4. Ensure Admin Role in public.admin_users
-  const { data: adminRecord } = await supabaseAdmin
+  // 4. Public Schema Sync (admin_users table)
+  console.log("-> Syncing with public.admin_users table...");
+  const { error: upsertError } = await supabaseAdmin
     .from("admin_users")
-    .select("*")
-    .eq("email", email)
-    .single();
+    .upsert({
+      auth_user_id: userId,
+      email: email.toLowerCase(),
+      role: role,
+      display_name: name
+    }, { onConflict: 'auth_user_id' });
 
-  if (!adminRecord) {
-    console.log(`Creating admin_users record with role: ${role}...`);
-    const { error: insertError } = await supabaseAdmin
-      .from("admin_users")
-      .insert({
-        auth_user_id: userId,
-        email: email,
-        role: role, 
-        display_name: name
-      });
-      
-    if (insertError) {
-        console.error("Error inserting admin record:", insertError);
-    } else {
-        console.log("Admin record created.");
-    }
+  if (upsertError) {
+    console.error("!! Error syncing admin record:", upsertError.message);
+    console.log("TIP: Make sure columns in admin_users allow 'text' for role.");
   } else {
-      console.log(`Admin record already exists. Updating role to '${role}'...`);
-      const { error: updateRoleError } = await supabaseAdmin
-        .from("admin_users")
-        .update({ role: role, display_name: name })
-        .eq('email', email);
-        
-      if (updateRoleError) {
-          console.error("Error updating admin role:", updateRoleError);
-      } else {
-          console.log("Admin role updated.");
-      }
+    console.log("✅ Public admin record synchronized.");
   }
-  
-  console.log("Done! You can now login with these credentials.");
+
+  console.log("\n✨ Done! You can now login at /admin/login");
 }
 
 createAdmin();
