@@ -13,9 +13,9 @@ export interface User {
   credits: number;
   diamonds: number;
   status: UserStatus;
+  admin_role?: AdminRole | null;
   city?: string | null;
   created_at?: string | null;
-  admin_role?: AdminRole | null;
 }
 
 export interface FortuneTeller {

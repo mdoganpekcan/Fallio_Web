@@ -484,47 +484,42 @@ export async function resolveFortune(formData: FormData) {
   return { success: true };
 }
 
-export async function setUserRole(formData: FormData) {
+export async function assignAdminRole(formData: FormData) {
+  const userId = formData.get("userId") as string;
   const email = formData.get("email") as string;
-  const role = formData.get("role") as string; // 'none' means remove admin
-  const userId = formData.get("userId") as string; // public.users.id
+  const name = formData.get("name") as string;
+  const role = formData.get("role") as string;
 
-  // 1. Get Authentication ID (we need auth_user_id for admin_users)
-  // We can look it up from public.users table if we have local ID, 
-  // OR we can just use the public user ID if it Matches Auth ID (which it does in our schema)
-  // public.users.id IS auth.users.id in our schema.
-  const authUserId = userId;
-
-  if (role === 'none') {
-    // Revoke Admin
-    const { error } = await supabaseAdmin.from("admin_users").delete().eq("email", email);
-    if (error) return { error: error.message };
-  } else {
-    // Grant/Update Admin
-    // Check if user exists in Auth first (Double check)
-    // Upsert into admin_users
-    const payload = {
-      auth_user_id: authUserId,
+  const { error } = await supabaseAdmin.from("admin_users").upsert(
+    {
+      auth_user_id: userId,
       email: email,
+      display_name: name,
       role: role,
-      display_name: email.split('@')[0] // Fallback name
-    };
+    },
+    { onConflict: "auth_user_id" }
+  );
 
-    // We try to upsert by email or auth_user_id
-    // But admin_users primary key is ID. We should check if it exists first to get ID for upsert, 
-    // or rely on unique constraints (email or auth_user_id).
-    // Our schema has unique email.
+  if (error) {
+    console.error("Assign Admin Error:", error);
+    return { error: error.message };
+  }
 
-    // Let's use ON CONFLICT (email) if possible, or manual check.
-    const { data: existing } = await supabaseAdmin.from("admin_users").select("id").eq("email", email).maybeSingle();
+  revalidatePath("/admin/users");
+  return { success: true };
+}
 
-    if (existing) {
-      const { error } = await supabaseAdmin.from("admin_users").update({ role }).eq("id", existing.id);
-      if (error) return { error: error.message };
-    } else {
-      const { error } = await supabaseAdmin.from("admin_users").insert(payload);
-      if (error) return { error: error.message };
-    }
+export async function revokeAdminRole(formData: FormData) {
+  const userId = formData.get("userId") as string;
+
+  const { error } = await supabaseAdmin
+    .from("admin_users")
+    .delete()
+    .eq("auth_user_id", userId);
+
+  if (error) {
+    console.error("Revoke Admin Error:", error);
+    return { error: error.message };
   }
 
   revalidatePath("/admin/users");
