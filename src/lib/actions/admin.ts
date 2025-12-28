@@ -478,9 +478,25 @@ export async function resolveFortune(formData: FormData) {
       { fortuneId }
     );
   }
-
   revalidatePath("/admin/fortunes");
   revalidatePath(`/admin/fortunes/${fortuneId}`);
+  return { success: true };
+}
+
+export async function deleteAdminUser(formData: FormData) {
+  const id = formData.get("id") as string;
+
+  const { error } = await supabaseAdmin
+    .from("admin_users")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Delete Admin Error:", error);
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/settings");
   return { success: true };
 }
 

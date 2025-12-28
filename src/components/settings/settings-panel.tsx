@@ -1,6 +1,6 @@
 "use client";
 
-import { upsertAISettings, upsertAdminUser, upsertSetting, upsertAppConfig } from "@/lib/actions/admin";
+import { upsertAISettings, upsertAdminUser, upsertSetting, upsertAppConfig, deleteAdminUser } from "@/lib/actions/admin";
 import type { AISettings, AdminUser, Settings, AppConfig } from "@/types";
 import { useEffect, useState, useTransition } from "react";
 import { Badge } from "../ui/badge";
@@ -118,7 +118,7 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-white">İletişim E-postası</label>
                 <Input
@@ -443,6 +443,26 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                   <Badge variant={admin.role === "admin" ? "success" : "muted"}>
                     {admin.role}
                   </Badge>
+                ),
+              },
+              {
+                key: "actions",
+                header: "İşlemler",
+                render: (admin) => (
+                  <form
+                    action={(formData) => {
+                      if (confirm("Bu admin yetkisini kaldırmak istediğinize emin misiniz?")) {
+                        startTransition(async () => {
+                          await deleteAdminUser(formData);
+                        });
+                      }
+                    }}
+                  >
+                    <input type="hidden" name="id" value={admin.id} />
+                    <Button type="submit" variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-500/10">
+                      Sil
+                    </Button>
+                  </form>
                 ),
               },
             ]}

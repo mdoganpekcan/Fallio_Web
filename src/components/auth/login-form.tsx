@@ -17,7 +17,7 @@ export function LoginForm() {
           ✦
         </div>
         <p className="text-sm uppercase tracking-[0.2rem] text-[var(--muted-foreground)]">
-          Falio Admin
+          Fallio Admin
         </p>
         <h1 className="mt-2 font-display text-2xl font-semibold text-white">
           Admin Panel Login
@@ -36,7 +36,7 @@ export function LoginForm() {
             required
             name="email"
             type="email"
-            placeholder="admin@falio.app"
+            placeholder="admin@fallio.com"
             className="w-full"
           />
         </div>
@@ -52,7 +52,7 @@ export function LoginForm() {
           <div className="flex justify-end text-sm">
             <a
               className="text-[var(--accent)] hover:underline"
-              href="mailto:destek@falio.app?subject=Parola%20Sifirlama%20Talebi"
+              href="mailto:destek@fallio.com?subject=Parola%20Sifirlama%20Talebi"
               aria-label="Forgot Password"
             >
               Forgot Password?
