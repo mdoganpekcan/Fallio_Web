@@ -1,114 +1,72 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-// RevenueCat Webhook Events
-// https://www.revenuecat.com/docs/integrations/webhooks/event-types
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // 1. Security Check
     const authHeader = req.headers.get("Authorization");
-    const expectedAuth = process.env.REVENUECAT_WEBHOOK_SECRET; // You need to set this in .env
+    const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
 
-    // RevenueCat sends "Bearer <token>" or just the token depending on config. 
-    // Usually we configure a custom header or use the Authorization header.
-    // Let's assume we set "Authorization" header in RevenueCat to "Bearer <REVENUECAT_WEBHOOK_SECRET>"
-    
-    if (!expectedAuth || authHeader !== `Bearer ${expectedAuth}`) {
-      // If env is not set, we might want to skip check for dev, but better to be safe.
-      if (process.env.NODE_ENV === 'production') {
-         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    if (!authHeader || authHeader !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const { event } = body;
 
     if (!event) {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const { type, app_user_id, product_id, price, currency, transaction_id, store } = event;
+    const { type, app_user_id, product_id, price } = event;
+    console.log(`[RevenueCat] Received event: ${type} for user: ${app_user_id} - Product: ${product_id}`);
 
-    console.log(`[RevenueCat Webhook] Received event: ${type} for user: ${app_user_id}`);
-
-    // We only care about successful purchases
-    const RELEVANT_EVENTS = [
-      "INITIAL_PURCHASE",
-      "NON_RENEWING_PURCHASE", // Consumables (Credits) usually come here
-      "RENEWAL",
-      "PRODUCT_CHANGE"
-    ];
-
-    if (!RELEVANT_EVENTS.includes(type)) {
+    // Sadece desteklenen eventleri işle
+    if (!["INITIAL_PURCHASE", "RENEWAL", "NON_RENEWING_PURCHASE"].includes(type)) {
+      console.log(`[RevenueCat] Ignored event type: ${type}`);
       return NextResponse.json({ message: "Event ignored" });
     }
 
-    // 2. Find the package in our DB to know how many credits to give
-    // We check both ios and android product ids
-    const { data: creditPackage, error: packageError } = await supabaseAdmin
-      .from("credit_packages")
-      .select("*")
-      .or(`ios_product_id.eq.${product_id},android_product_id.eq.${product_id}`)
-      .single();
+    // 1. Kredileri Yükle (RPC ile)
+    let creditsToAdd = 0;
+    // Basit bir eşleştirme (Gerçek senaryoda veritabanından paket detaylarını çekmek daha iyidir)
+    if (product_id.includes("coin_100")) creditsToAdd = 100;
+    else if (product_id.includes("coin_500")) creditsToAdd = 500;
+    else if (product_id.includes("premium")) creditsToAdd = 0; // Aboneliklerde kredi verilmiyorsa
 
-    if (packageError || !creditPackage) {
-      console.error(`[RevenueCat Webhook] Package not found for product_id: ${product_id}`);
-      // It might be a subscription (Pro mode) instead of credits.
-      // TODO: Handle subscriptions here if needed.
-      return NextResponse.json({ message: "Package not found, skipping credit update" });
+    if (creditsToAdd > 0) {
+      const { error: rpcError } = await supabaseAdmin.rpc("handle_credit_transaction", {
+        p_user_id: app_user_id,
+        p_amount: creditsToAdd,
+        p_transaction_type: `revenuecat_${type.toLowerCase()}`
+      });
+
+      if (rpcError) {
+        console.error("[RevenueCat] Credit update failed:", rpcError);
+        return NextResponse.json({ error: "Credit update failed" }, { status: 500 });
+      }
+      console.log(`[RevenueCat] Added ${creditsToAdd} credits to user ${app_user_id}`);
     }
 
-    // 3. Update User Wallet
-    // First get current wallet
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from("wallet")
-      .select("*")
-      .eq("user_id", app_user_id)
-      .single();
-
-    if (walletError && walletError.code !== 'PGRST116') { // PGRST116 is "not found"
-       console.error("[RevenueCat Webhook] Wallet fetch error:", walletError);
-       return NextResponse.json({ error: "Wallet fetch error" }, { status: 500 });
-    }
-
-    // If wallet doesn't exist, create it (should exist from auth trigger, but just in case)
-    if (!wallet) {
-       await supabaseAdmin.from("wallet").insert({
-         user_id: app_user_id,
-         credits: creditPackage.credits
-       });
-    } else {
-       // Increment credits
-       await supabaseAdmin.from("wallet").update({
-         credits: wallet.credits + creditPackage.credits,
-         updated_at: new Date().toISOString()
-       }).eq("user_id", app_user_id);
-    }
-
-    // 4. Log Transaction
-    // Ensure 'transactions' table exists (as per previous instructions)
-    const { error: transError } = await supabaseAdmin.from("transactions").insert({
+    // 2. İşlemi Logla
+    const { error: logError } = await supabaseAdmin.from("transactions").insert({
       user_id: app_user_id,
-      package_id: creditPackage.id,
-      amount: price,
-      currency: currency,
-      credits_amount: creditPackage.credits,
-      transaction_type: 'purchase',
-      provider: store === 'APP_STORE' ? 'apple' : 'google',
-      provider_transaction_id: transaction_id,
-      status: 'completed'
+      amount: price?.amount_in_micros ? price.amount_in_micros / 1000000 : 0,
+      currency: price?.currency_code || "USD",
+      package_id: null, // Paket ID eşleşmesi yapılabilir
+      transaction_type: "purchase",
+      provider: "revenuecat",
+      provider_transaction_id: event.id,
+      status: "completed",
+      credits_amount: creditsToAdd
     });
 
-    if (transError) {
-      console.error("[RevenueCat Webhook] Transaction log error:", transError);
-      // Don't fail the request, credits are already given.
+    if (logError) {
+      console.error("[RevenueCat] Transaction log failed:", logError);
     }
 
     return NextResponse.json({ success: true });
-
-  } catch (error: any) {
-    console.error("[RevenueCat Webhook] Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("[RevenueCat] Webhook error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
