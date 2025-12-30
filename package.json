@@ -12,9 +12,8 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
-    "@sentry/nextjs": "^8.47.0",
-    "react-is": "^19.0.0",
     "@radix-ui/react-slot": "^1.2.4",
+    "@sentry/nextjs": "^8.55.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.86.0",
     "class-variance-authority": "^0.7.1",
@@ -27,6 +26,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.67.0",
+    "react-is": "^19.0.0",
     "recharts": "^3.5.1",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.1.13"
