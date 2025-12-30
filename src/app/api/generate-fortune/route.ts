@@ -7,58 +7,63 @@ import Anthropic from "@anthropic-ai/sdk";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { fortuneId, userNote, fortuneType, userZodiac, userGender, userJob, userRelation, metadata } = body;
+    const { fortuneId, userNote, fortuneType, userZodiac, userGender, userJob, userRelation, metadata, language = "tr" } = body;
 
     // 1. Fetch AI Settings
     const { data: settings } = await supabaseAdmin.from("ai_settings").select("*").single();
 
     if (!settings) {
-      return NextResponse.json({ error: "AI ayarları bulunamadı." }, { status: 400 });
+      return NextResponse.json({ error: "AI settings not found." }, { status: 400 });
     }
 
     // 2. Determine Preferred Provider
-    // Start with Global Default
     let preferredProvider = settings.active_provider || "gemini";
     let preferredModel: string | null = null;
 
-    // Check for Fortune Teller Override
     if (fortuneId) {
       const { data: fortune } = await supabaseAdmin.from("fortunes").select("teller_id").eq("id", fortuneId).single();
       if (fortune?.teller_id) {
         const { data: teller } = await supabaseAdmin.from("fortune_tellers").select("ai_provider, ai_model").eq("id", fortune.teller_id).single();
-
-        // Only override if the teller has a specific provider set and it is not empty/null
         if (teller?.ai_provider) {
           const tellerProvider = teller.ai_provider.toLowerCase();
-          // If the teller explicitly sets a provider (and it's not some 'default' placeholder if you have one)
           if (tellerProvider && tellerProvider !== 'default') {
             preferredProvider = tellerProvider;
-            if (preferredProvider === 'chatgpt') preferredProvider = 'openai'; // Map chatgpt to openai
+            if (preferredProvider === 'chatgpt') preferredProvider = 'openai';
             preferredModel = teller.ai_model;
           }
         }
       }
     }
 
-    // 3. Construct Prompt
-    let prompt = settings.base_prompt || "Sen deneyimli bir falcısın. Kullanıcının falını yorumla.";
-    prompt = prompt.replace("{{fortune_type}}", fortuneType);
+    // 3. Construct Prompt with Language Support
+    let basePrompt = settings.base_prompt || "You are an experienced fortune teller. Interpret the user's fortune for the type: {{fortune_type}}.";
+    
+    let languageInstruction = "";
+    if (language === "en") {
+      languageInstruction = "\nIMPORTANT: You MUST write your response in ENGLISH. Use mystical, engaging, and professional tone suitable for a fortune teller. Use English idioms where appropriate.";
+    } else if (language === "tr") {
+      languageInstruction = "\nÖNEMLİ: Yanıtını TÜRKÇE olarak yazmalısın. Samimi, gizemli, etkileyici ve Türk fal kültürüne uygun deyimler kullan.";
+    } else {
+      languageInstruction = `\nIMPORTANT: You MUST write your entire response in the language with code: ${language}. Do not provide translation.`;
+    }
+
+    const finalBasePrompt = basePrompt.replace("{{fortune_type}}", fortuneType);
 
     let extraDetails = "";
     if (metadata) {
-      if (metadata.selected_cards) extraDetails += `\n- Seçilen Kartlar: ${Array.isArray(metadata.selected_cards) ? metadata.selected_cards.join(", ") : metadata.selected_cards}`;
-      if (metadata.selected_color) extraDetails += `\n- Seçilen Renk: ${metadata.selected_color}`;
-      if (metadata.category) extraDetails += `\n- Kategori: ${metadata.category}`;
+      if (metadata.selected_cards) extraDetails += `\n- Selected Cards: ${Array.isArray(metadata.selected_cards) ? metadata.selected_cards.join(", ") : metadata.selected_cards}`;
+      if (metadata.selected_color) extraDetails += `\n- Selected Color: ${metadata.selected_color}`;
+      if (metadata.category) extraDetails += `\n- Category: ${metadata.category}`;
     }
 
     const userContext = `
-    Kullanıcı Bilgileri:
-    - Burç: ${userZodiac || "Bilinmiyor"}
-    - Cinsiyet: ${userGender || "Bilinmiyor"}
-    - Meslek: ${userJob || "Bilinmiyor"}
-    - İlişki Durumu: ${userRelation || "Bilinmiyor"}
-    - Fal Türü: ${fortuneType}
-    - Kullanıcı Notu: ${userNote || "Yok"}${extraDetails}
+    User Context:
+    - Zodiac: ${userZodiac || "Unknown"}
+    - Gender: ${userGender || "Unknown"}
+    - Job: ${userJob || "Unknown"}
+    - Relation Status: ${userRelation || "Unknown"}
+    - Fortune Type: ${fortuneType}
+    - User Note: ${userNote || "None"}${extraDetails}
     `;
 
     // 4. Fetch Images if exists
@@ -98,7 +103,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const fullPrompt = `${prompt}\n\n${userContext}\n\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. ${imageParts.length > 0 ? "Sana gönderdiğim resimleri detaylıca analiz et ve yorumuna dahil et." : ""}`;
+    const fullPrompt = `${finalBasePrompt}\n\n${userContext}\n${languageInstruction}\n\n${imageParts.length > 0 ? "Analyze the provided images in detail and include them in your interpretation." : ""}`;
 
     let responseText = "";
 
@@ -213,7 +218,7 @@ export async function POST(req: Request) {
 
         const completion = await openai.chat.completions.create({
           messages: [
-            { role: "system", content: "Sen bir falcısın." },
+            { role: "system", content: `You are a professional fortune teller. ${languageInstruction}` },
             { role: "user", content: content as any }
           ],
           model: modelName,

@@ -63,35 +63,45 @@ export async function GET(req: Request) {
     const results = [];
 
     // 4. Falları İşle
+    const url = new URL(req.url);
+    const queryLang = url.searchParams.get('lang') || 'tr';
+
     for (const fortune of fortunes) {
       try {
-        // Prompt Hazırlığı
         const meta = fortune.metadata as any || {};
-        const language = meta.language || 'tr'; // Default to Turkish if not specified
-        const languageInstruction = language === 'en' ? "Please provide the response in English." : "Lütfen yanıtı Türkçe ver.";
+        const language = meta.language || queryLang;
+        
+        let languageInstruction = "";
+        if (language === "en") {
+          languageInstruction = "\nIMPORTANT: You MUST write your response in ENGLISH. Use mystical, engaging, and professional tone suitable for a fortune teller. Use English idioms where appropriate.";
+        } else if (language === "tr") {
+          languageInstruction = "\nÖNEMLİ: Yanıtını TÜRKÇE olarak yazmalısın. Samimi, gizemli, etkileyici ve Türk fal kültürüne uygun deyimler kullan.";
+        } else {
+          languageInstruction = `\nIMPORTANT: You MUST write your entire response in the language with code: ${language}. Do not provide translation.`;
+        }
 
-        let prompt = settings.base_prompt || "Sen deneyimli bir falcısın. Kullanıcının falını yorumla.";
-        prompt = prompt.replace("{{fortune_type}}", fortune.type);
+        let promptTemplate = settings.base_prompt || "You are an experienced fortune teller. Interpret the user's fortune for the type: {{fortune_type}}.";
+        let finalBasePrompt = promptTemplate.replace("{{fortune_type}}", fortune.type);
 
         let extraDetails = "";
         if (fortune.metadata) {
-          if (meta.selected_cards) extraDetails += `\n- Seçilen Kartlar: ${Array.isArray(meta.selected_cards) ? meta.selected_cards.join(", ") : meta.selected_cards}`;
-          if (meta.selected_color) extraDetails += `\n- Seçilen Renk: ${meta.selected_color}`;
-          if (meta.category) extraDetails += `\n- Kategori: ${meta.category}`;
+          if (meta.selected_cards) extraDetails += `\n- Selected Cards: ${Array.isArray(meta.selected_cards) ? meta.selected_cards.join(", ") : meta.selected_cards}`;
+          if (meta.selected_color) extraDetails += `\n- Selected Color: ${meta.selected_color}`;
+          if (meta.category) extraDetails += `\n- Category: ${meta.category}`;
         }
 
         const user = fortune.users as any;
         const userContext = `
-        Kullanıcı Bilgileri:
-        - İsim: ${user?.full_name || "Gizli"}
-        - Burç: ${user?.zodiac_sign || "Bilinmiyor"}
-        - Cinsiyet: ${user?.gender || "Bilinmiyor"}
-        - Meslek: ${user?.job || "Bilinmiyor"}
-        - Fal Türü: ${fortune.type}
-        - Kullanıcı Notu: ${fortune.user_note || "Yok"}${extraDetails}
+        User Context:
+        - Name: ${user?.full_name || "Hidden"}
+        - Zodiac: ${user?.zodiac_sign || "Unknown"}
+        - Gender: ${user?.gender || "Unknown"}
+        - Job: ${user?.job || "Unknown"}
+        - Fortune Type: ${fortune.type}
+        - User Note: ${fortune.user_note || "None"}${extraDetails}
         `;
 
-        const fullPrompt = `${prompt}\n\n${userContext}\n\n${languageInstruction}\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
+        const fullPrompt = `${finalBasePrompt}\n\n${userContext}\n${languageInstruction}\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
 
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
 
@@ -118,7 +128,10 @@ export async function GET(req: Request) {
           const finalModel = modelName || settings.openai_model || "gpt-4o-mini";
 
           const completion = await openai.chat.completions.create({
-            messages: [{ role: "user", content: fullPrompt }],
+            messages: [
+              { role: "system", content: `You are a professional fortune teller. ${languageInstruction}` },
+              { role: "user", content: fullPrompt }
+            ],
             model: finalModel,
           });
 
