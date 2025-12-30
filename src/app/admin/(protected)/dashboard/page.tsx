@@ -2,17 +2,19 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LineChart } from "@/components/charts/line-chart";
 import { BarChart } from "@/components/charts/bar-chart";
+import { PieChart } from "@/components/charts/pie-chart";
 import { Avatar } from "@/components/ui/avatar";
 import { Table } from "@/components/tables/table";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { fetchDashboardStats, fetchRecentFortunes, fetchRecentUsers } from "@/lib/data";
+import { fetchDashboardStats, fetchRecentFortunes, fetchRecentUsers, fetchFortuneTypeStats } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 
 export default async function DashboardPage() {
   const stats = await fetchDashboardStats();
   const recentUsers = await fetchRecentUsers(5);
   const fortunes = await fetchRecentFortunes(6);
+  const fortuneTypeStats = await fetchFortuneTypeStats();
 
   const weeklyData = [
     { label: "Mon", value: 68 },
@@ -69,7 +71,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-4">
         <Card className="xl:col-span-2">
           <CardHeader
             title="Weekly Fortune Submissions"
@@ -77,6 +79,15 @@ export default async function DashboardPage() {
           />
           <CardContent>
             <LineChart data={weeklyData} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader
+            title="Fortune Types"
+            description="Fal türü dağılımı"
+          />
+          <CardContent>
+            <PieChart data={fortuneTypeStats} />
           </CardContent>
         </Card>
         <Card>

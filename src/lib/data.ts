@@ -65,6 +65,24 @@ export async function fetchDashboardStats() {
   };
 }
 
+export async function fetchFortuneTypeStats() {
+  const { data, error } = await supabaseAdmin
+    .from("fortunes")
+    .select("type");
+
+  if (error || !data) return [];
+
+  const statsMap: Record<string, number> = {};
+  data.forEach((item) => {
+    statsMap[item.type] = (statsMap[item.type] || 0) + 1;
+  });
+
+  return Object.entries(statsMap).map(([label, value]) => ({
+    label: label.charAt(0).toUpperCase() + label.slice(1),
+    value,
+  }));
+}
+
 export async function fetchRecentUsers(limit = 5): Promise<User[]> {
   const { data } = await supabaseAdmin
     .from("users")
