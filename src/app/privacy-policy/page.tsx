@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
       <p className="mb-4">Son Güncelleme: {new Date().toLocaleDateString('tr-TR')}</p>
       
       <p className="mb-4">
-        Falio ("biz", "bizim"), kullanıcılarımızın ("siz") gizliliğine önem verir. Bu Gizlilik Politikası, mobil uygulamamızı kullanırken bilgilerinizin nasıl toplandığını, kullanıldığını ve paylaşıldığını açıklar.
+        Bu Gizlilik Politikası, <strong>MoiV Interactive</strong> tarafından geliştirilen <strong>Fallio</strong> mobil uygulamasını ("Uygulama") kullanırken bilgilerinizin nasıl toplandığını, kullanıldığını ve yönetildiğini açıklar.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-3">1. Toplanan Bilgiler</h2>
@@ -40,9 +40,26 @@ export default function PrivacyPolicy() {
         </ul>
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">5. Haklarınız</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">5. Hesap Silme ve Haklarınız</h2>
       <p className="mb-4">
-        Dilediğiniz zaman hesabınızın ve verilerinizin silinmesini talep edebilirsiniz. Bunun için uygulama içi "Hesabımı Sil" seçeneğini kullanabilir veya support@fallio.com adresine e-posta gönderebilirsiniz.
+        Kullanıcılar, diledikleri zaman hesaplarını ve ilişkili tüm verilerini kalıcı olarak silme hakkına sahiptir. Hesap silme işlemi geri alınamaz.
+      </p>
+      
+      <h3 className="text-lg font-medium mt-4 mb-2">Hesabınızı Nasıl Silebilirsiniz?</h3>
+      <p className="mb-4">
+        Hesabınızı silmek için uygulama içerisinden şu adımları takip edebilirsiniz:
+        <ol className="list-decimal ml-6 mt-2 mb-4">
+          <li>Fallio uygulamasını açın ve giriş yapın.</li>
+          <li>Alt menüden <strong>Profil</strong> sekmesine gidin.</li>
+          <li>Sağ üst köşedeki <strong>Ayarlar</strong> (Dişli İkonu) butonuna tıklayın.</li>
+          <li>Ayarlar menüsünün en altında bulunan <strong>"Hesabımı Sil"</strong> seçeneğine dokunun.</li>
+          <li>Çıkan onay penceresinde silme işlemini onaylayın.</li>
+        </ol>
+        Hesap silme talebiniz anında işleme alınır; tüm kişisel verileriniz, fal geçmişiniz ve kredileriniz veritabanımızdan kalıcı olarak silinir.
+      </p>
+      
+      <p className="mb-4">
+        Alternatif olarak, <strong><a href="mailto:support@fallio.com" className="text-blue-600 underline">support@fallio.com</a></strong> adresine hesabınızın bağlı olduğu e-posta adresi üzerinden bir talep göndererek de silme işlemini başlatabilirsiniz.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-3">6. İletişim</h2>
