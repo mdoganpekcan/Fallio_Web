@@ -32,8 +32,8 @@ export default withSentryConfig(nextConfig, {
 
   // Suppresses source map uploading logs during bundling
   silent: true,
-  org: "fallio",
-  project: "fallio-admin",
+  org: "moiv-interactive",
+  project: "fallio-web",
 
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
@@ -45,14 +45,13 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
 
   // Hides source maps from generated client bundles
-  hideSourceMaps: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
+  // disableLogger: true, // Deprecated
 
   // Enables automatic instrumentation of Vercel Cron Monitors.
-  // See the following for more information:
-  // https://docs.sentry.io/product/crons/
-  // https://vercel.com/docs/cron-jobs
-  automaticVercelMonitors: true,
+  // automaticVercelMonitors: true, // Deprecated
 });
