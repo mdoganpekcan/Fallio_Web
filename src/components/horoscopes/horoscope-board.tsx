@@ -117,6 +117,7 @@ export function HoroscopeBoard({
       </div>
 
       <form
+        key={`${selectedSign}-${scope}`}
         action={(formData) =>
           startTransition(async () => {
             formData.set("sign", selectedSign);
