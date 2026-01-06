@@ -330,20 +330,8 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
             }
             className="grid gap-4 md:grid-cols-2"
           >
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-sm font-semibold text-white">Base Prompt</label>
-              <Textarea
-                name="base_prompt"
-                defaultValue={safeAI.base_prompt}
-                placeholder="Örnek: Sen {{fortune_type}} konusunda uzman bir falcısın. Kullanıcının notlarını ve görsellerini gerçek bir falcı gibi yorumla..."
-                rows={4}
-                required
-              />
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Not: <code className="rounded bg-black/30 px-1 py-0.5">{"{{fortune_type}}"}</code> değişkeni fal türüne göre otomatik
-                yerleştirilebilir.
-              </p>
-            </div>
+            {/* Base Prompt Removed by User Request - Now Managed in Prompt Management Page */}
+            <input type="hidden" name="base_prompt" value={safeAI.base_prompt} />
 
             <div className="md:col-span-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 space-y-2">
               <p className="text-sm font-bold text-yellow-500">Varsayılan Yapay Zeka Sağlayıcısı</p>
