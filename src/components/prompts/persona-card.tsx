@@ -13,17 +13,17 @@ export function PersonaCard({ persona }: { persona: any }) {
 
   return (
     <Card key={persona.id} className="group relative overflow-hidden transition-all hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-1 bg-[var(--card)] border-[var(--border)]">
-       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg text-white capitalize">{persona.key}</h3>
-            {persona.updated_at && (
+      <CardHeader 
+        title={persona.key} 
+        description={persona.description}
+        action={
+            persona.updated_at && (
                 <span className="text-xs text-[var(--muted-foreground)]">
-                    Son: {new Date(persona.updated_at).toLocaleDateString('tr-TR')}
+                    {new Date(persona.updated_at).toLocaleDateString('tr-TR')}
                 </span>
-            )}
-        </div>
-        <p className="text-sm text-[var(--muted-foreground)]">{persona.description}</p>
-      </CardHeader>
+            )
+        }
+      />
       <CardContent>
         <form
             action={(formData) => {

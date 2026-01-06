@@ -343,3 +343,17 @@ export async function fetchFortuneDetail(id: string) {
     images: (data as { fortune_images?: { url: string }[] }).fortune_images ?? [],
   };
 }
+
+export async function fetchPersonas() {
+  const { data } = await supabaseAdmin.from("prompt_personas").select("*").order("key");
+  return data ?? [];
+}
+
+export async function fetchPersonaByKey(key: string) {
+  const { data } = await supabaseAdmin
+    .from("prompt_personas")
+    .select("persona")
+    .eq("key", key)
+    .single();
+  return data?.persona ?? null;
+}
