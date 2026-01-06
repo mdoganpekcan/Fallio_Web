@@ -343,7 +343,7 @@ export function SettingsPanel({ settings, admins, aiSettings, appConfig }: Props
                 defaultValue={safeAI.active_provider || "gemini"}
                 options={[
                   { label: "Google Gemini (Önerilen)", value: "gemini" },
-                  { label: "Anthropic Claude", value: "claude" },
+                  { label: "Anthropic Claude", value: "claude" }, 
                   { label: "OpenAI ChatGPT", value: "openai" },
                 ]}
               />
