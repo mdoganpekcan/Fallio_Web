@@ -12,6 +12,7 @@ import {
   LogOut,
   Mail,
   Settings2,
+  MessageSquareText,
   Sparkles,
   Stars,
   Users,
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/admin/horoscopes", label: "Burç Yorumları", icon: Sparkles },
   { href: "/admin/credits", label: "Kredi & Ekonomi", icon: CreditCard },
   { href: "/admin/notifications", label: "Bildirim Merkezi", icon: Bell },
+  { href: "/admin/prompts", label: "Yapay Zeka Promptları", icon: MessageSquareText },
   { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings2 },
 ];
 
