@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -19,15 +19,6 @@ export default function AuthCallbackPage() {
         
         if (!error) {
           // Başarılı giriş sonrası mobil uygulamaya yönlendir
-          // URL Scheme: fallio://
-          // Parametreler ile access token'ı iletebiliriz veya 
-          // Supabase session'ı zaten cookie'de/storage'da oluştuğu için 
-          // mobil uygulama açılınca session'ı yenileyebilir.
-          
-          // En güvenli yöntem: Deep link ile redirect
-          // Ancak Supabase auth flow'u genellikle session'ı alır.
-          // Burada sadece başarı mesajı gösterip uygulamaya dönmesini sağlayabiliriz
-          // Veya direkt yönlendirme:
           window.location.href = 'fallio://auth/callback';
         }
       }
@@ -42,5 +33,13 @@ export default function AuthCallbackPage() {
       <h1 className="text-xl font-bold mb-2">Giriş Yapılıyor...</h1>
       <p className="text-gray-400">Lütfen bekleyin, uygulamaya yönlendiriliyorsunuz.</p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#0D0A1A] text-white">Yükleniyor...</div>}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
