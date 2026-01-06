@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { FortunePromptBuilder } from "@/lib/ai/prompt-builder";
 
 export async function GET(req: Request) {
   try {
@@ -70,38 +71,22 @@ export async function GET(req: Request) {
       try {
         const meta = fortune.metadata as any || {};
         const language = meta.language || queryLang;
-        
-        let languageInstruction = "";
-        if (language === "en") {
-          languageInstruction = "\nIMPORTANT: You MUST write your response in ENGLISH. Use mystical, engaging, and professional tone suitable for a fortune teller. Use English idioms where appropriate.";
-        } else if (language === "tr") {
-          languageInstruction = "\nÖNEMLİ: Yanıtını TÜRKÇE olarak yazmalısın. Samimi, gizemli, etkileyici ve Türk fal kültürüne uygun deyimler kullan.";
-        } else {
-          languageInstruction = `\nIMPORTANT: You MUST write your entire response in the language with code: ${language}. Do not provide translation.`;
-        }
-
-        let promptTemplate = settings.base_prompt || "You are an experienced fortune teller. Interpret the user's fortune for the type: {{fortune_type}}.";
-        let finalBasePrompt = promptTemplate.replace("{{fortune_type}}", fortune.type);
-
-        let extraDetails = "";
-        if (fortune.metadata) {
-          if (meta.selected_cards) extraDetails += `\n- Selected Cards: ${Array.isArray(meta.selected_cards) ? meta.selected_cards.join(", ") : meta.selected_cards}`;
-          if (meta.selected_color) extraDetails += `\n- Selected Color: ${meta.selected_color}`;
-          if (meta.category) extraDetails += `\n- Category: ${meta.category}`;
-        }
-
         const user = fortune.users as any;
-        const userContext = `
-        User Context:
-        - Name: ${user?.full_name || "Hidden"}
-        - Zodiac: ${user?.zodiac_sign || "Unknown"}
-        - Gender: ${user?.gender || "Unknown"}
-        - Job: ${user?.job || "Unknown"}
-        - Fortune Type: ${fortune.type}
-        - User Note: ${fortune.user_note || "None"}${extraDetails}
-        `;
 
-        const fullPrompt = `${finalBasePrompt}\n\n${userContext}\n${languageInstruction}\nLütfen samimi, gizemli ve etkileyici bir dille fal yorumunu yap. Cevabın sadece fal yorumu olsun.`;
+        const context = {
+          fortuneType: fortune.type,
+          userZodiac: user?.zodiac_sign,
+          userGender: user?.gender,
+          userJob: user?.job,
+          userRelation: user?.relationship_status, // Ensure this field exists in query if needed, currently not selected in GET but user context implies it
+          userNote: fortune.user_note,
+          metadata: meta,
+          language: language,
+          imageCount: 0 // Will be implicit in how we send images, but good for prompt text
+        };
+
+        const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context);
+        const userMessage = FortunePromptBuilder.buildUserMessage(context);
 
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;
 
@@ -129,8 +114,8 @@ export async function GET(req: Request) {
 
           const completion = await openai.chat.completions.create({
             messages: [
-              { role: "system", content: `You are a professional fortune teller. ${languageInstruction}` },
-              { role: "user", content: fullPrompt }
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage }
             ],
             model: finalModel,
           });
@@ -146,7 +131,7 @@ export async function GET(req: Request) {
           const msg = await anthropic.messages.create({
             model: finalModel,
             max_tokens: 1024,
-            messages: [{ role: "user", content: fullPrompt }],
+            messages: [{ role: "user", content: `${systemPrompt}\n\n${userMessage}` }],
           });
           // @ts-ignore
           responseText = msg.content[0].text;
@@ -168,7 +153,7 @@ export async function GET(req: Request) {
             ]
           });
 
-          const result = await model.generateContent(fullPrompt);
+          const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
           responseText = result.response.text();
         }
 

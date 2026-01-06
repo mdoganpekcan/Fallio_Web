@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { FortunePromptBuilder } from "@/lib/ai/prompt-builder";
 
 export async function POST(req: Request) {
   try {
@@ -35,36 +36,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Construct Prompt with Language Support
-    let basePrompt = settings.base_prompt || "You are an experienced fortune teller. Interpret the user's fortune for the type: {{fortune_type}}.";
-    
-    let languageInstruction = "";
-    if (language === "en") {
-      languageInstruction = "\nIMPORTANT: You MUST write your response in ENGLISH. Use mystical, engaging, and professional tone suitable for a fortune teller. Use English idioms where appropriate.";
-    } else if (language === "tr") {
-      languageInstruction = "\nÖNEMLİ: Yanıtını TÜRKÇE olarak yazmalısın. Samimi, gizemli, etkileyici ve Türk fal kültürüne uygun deyimler kullan.";
-    } else {
-      languageInstruction = `\nIMPORTANT: You MUST write your entire response in the language with code: ${language}. Do not provide translation.`;
-    }
-
-    const finalBasePrompt = basePrompt.replace("{{fortune_type}}", fortuneType);
-
-    let extraDetails = "";
-    if (metadata) {
-      if (metadata.selected_cards) extraDetails += `\n- Selected Cards: ${Array.isArray(metadata.selected_cards) ? metadata.selected_cards.join(", ") : metadata.selected_cards}`;
-      if (metadata.selected_color) extraDetails += `\n- Selected Color: ${metadata.selected_color}`;
-      if (metadata.category) extraDetails += `\n- Category: ${metadata.category}`;
-    }
-
-    const userContext = `
-    User Context:
-    - Zodiac: ${userZodiac || "Unknown"}
-    - Gender: ${userGender || "Unknown"}
-    - Job: ${userJob || "Unknown"}
-    - Relation Status: ${userRelation || "Unknown"}
-    - Fortune Type: ${fortuneType}
-    - User Note: ${userNote || "None"}${extraDetails}
-    `;
+    const context = {
+      fortuneType: fortuneType,
+      userZodiac: userZodiac,
+      userGender: userGender,
+      userJob: userJob,
+      userRelation: userRelation,
+      userNote: userNote,
+      metadata: metadata,
+      language: language,
+      imageCount: 0 // Will be updated after image download
+    };
 
     // 4. Fetch Images if exists
     let imageParts: any[] = [];
@@ -103,7 +85,10 @@ export async function POST(req: Request) {
       }
     }
 
-    const fullPrompt = `${finalBasePrompt}\n\n${userContext}\n${languageInstruction}\n\n${imageParts.length > 0 ? "Analyze the provided images in detail and include them in your interpretation." : ""}`;
+    context.imageCount = imageParts.length;
+
+    const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context);
+    const userMessage = FortunePromptBuilder.buildUserMessage(context);
 
     let responseText = "";
 
@@ -184,7 +169,7 @@ export async function POST(req: Request) {
             ]
           });
 
-          const result = await model.generateContent([fullPrompt, ...imageParts]);
+          const result = await model.generateContent([systemPrompt + "\n\n" + userMessage, ...imageParts]);
           const text = result.response.text();
           if (text) return text;
         } catch (e: any) {
@@ -208,19 +193,19 @@ export async function POST(req: Request) {
         const openai = new OpenAI({ apiKey: settings.openai_api_key });
         const modelName = (preferredProvider === 'openai' && preferredModel) ? preferredModel : (settings.openai_model || "gpt-4o");
 
-        const content: any[] = [{ type: "text", text: fullPrompt }];
-        imageParts.forEach(part => {
-          content.push({
-            type: "image_url",
-            image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+          const content: any[] = [{ type: "text", text: userMessage }];
+          imageParts.forEach(part => {
+            content.push({
+              type: "image_url",
+              image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+            });
           });
-        });
 
-        const completion = await openai.chat.completions.create({
-          messages: [
-            { role: "system", content: `You are a professional fortune teller. ${languageInstruction}` },
-            { role: "user", content: content as any }
-          ],
+          const completion = await openai.chat.completions.create({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: content as any }
+            ],
           model: modelName,
         });
         return completion.choices[0].message.content || "";
@@ -242,7 +227,7 @@ export async function POST(req: Request) {
         const msg = await anthropic.messages.create({
           model: modelName,
           max_tokens: 1024,
-          messages: [{ role: "user", content: fullPrompt }],
+          messages: [{ role: "user", content: `${systemPrompt}\n\n${userMessage}` }],
         });
         // @ts-ignore
         return msg.content[0].text;
