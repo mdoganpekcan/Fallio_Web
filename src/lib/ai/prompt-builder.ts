@@ -44,10 +44,29 @@ export class FortunePromptBuilder {
     const persona = personaOverride || PERSONAS[typeKey] || PERSONAS.default;
     
     let languageInstruction = "";
-    if (ctx.language === "en") {
-      languageInstruction = "OUTPUT LANGUAGE: ENGLISH. Use mystical idioms (e.g., 'The stars align...', 'A shroud of mystery...').";
-    } else {
-      languageInstruction = "ÇIKTI DİLİ: TÜRKÇE. (Kesinlikle Türkçe yanıt ver). Üslubun samimi, 'Canım', 'Bakıyorum da...', 'Yüreğin kabarmış' gibi geleneksel falcı ağzına yakın ama profesyonel olsun.";
+    const lang = ctx.language ? ctx.language.toLowerCase() : "tr";
+
+    switch (true) {
+      case lang.startsWith("tr"):
+        languageInstruction = "ÇIKTI DİLİ: TÜRKÇE. (Kesinlikle Türkçe yanıt ver). Üslubun samimi, 'Canım', 'Bakıyorum da...', 'Yüreğin kabarmış' gibi geleneksel falcı ağzına yakın ama profesyonel olsun.";
+        break;
+      case lang.startsWith("en"):
+        languageInstruction = "OUTPUT LANGUAGE: ENGLISH. Use a mystical, engaging tone. You are a wise fortune teller. Use phrases like 'I see...', ' The cards reveal...'.";
+        break;
+      case lang.startsWith("de"):
+        languageInstruction = "AUSGABESPRACHE: DEUTSCH. Antworte in einem mystischen, aber professionellen Ton. Du bist eine weise Wahrsagerin. Benutze Phrasen wie 'Ich sehe...', 'Die Karten offenbaren...'.";
+        break;
+      case lang.startsWith("fr"):
+        languageInstruction = "LANGUE DE SORTIE : FRANÇAIS. Utilisez un ton mystique et engageant. Vous êtes une voyante sage.";
+        break;
+      case lang.startsWith("es"):
+        languageInstruction = "IDIOMA DE SALIDA: ESPAÑOL. Usa un tono místico y cautivador. Eres una adivina sabia.";
+        break;
+      case lang.startsWith("az"):
+        languageInstruction = "ÇIXIŞ DİLİ: AZƏRBAYCAN TÜRKCƏSİ. Səmimi və peşəkar falçı tonunda danış. 'Canım', 'Baxıram ki...' kimi ifadələr işlət.";
+        break;
+      default:
+        languageInstruction = `OUTPUT LANGUAGE: ${lang.toUpperCase()}. Translate your mystical persona to this language. Be wise and professional.`;
     }
 
     return `${persona}
@@ -85,6 +104,10 @@ CORE RULES:
 
     if (ctx.imageCount && ctx.imageCount > 0) {
       message += `\n\nI have visually attached ${ctx.imageCount} images of my cup/hand/spread. Look at them closely. Describe what you see in the images to prove you are really reading them.`;
+    }
+
+    if (ctx.language) {
+      message += `\n\nIMPORTANT: Please write your response in the language code: "${ctx.language}".`;
     }
 
     return message;
