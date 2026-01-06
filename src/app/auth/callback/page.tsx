@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+import { createSupabaseBrowserClient } from '@/lib/supabase';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function AuthCallbackPage() {
       const next = searchParams.get('next') ?? '/';
 
       if (code) {
-        const supabase = createClient();
+        const supabase = createSupabaseBrowserClient();
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         
         if (!error) {
