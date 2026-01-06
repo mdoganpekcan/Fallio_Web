@@ -47,22 +47,96 @@ export async function fetchAppConfig(): Promise<AppConfig> {
 }
 
 export async function fetchDashboardStats() {
-  const [usersRes, fortunesRes, tellersRes] = await Promise.all([
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [usersRes, fortunesRes, tellersRes, revenueRes] = await Promise.all([
     supabaseAdmin.from("users").select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("fortunes")
-      .select("id", { count: "exact", head: true }),
+    supabaseAdmin.from("fortunes").select("id", { count: "exact", head: true }),
     supabaseAdmin
       .from("fortune_tellers")
-      .select("id", { count: "exact", head: true }),
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+    supabaseAdmin
+      .from("transactions")
+      .select("amount")
+      .gte("created_at", today.toISOString())
+      .eq("status", "completed")
+      .eq("transaction_type", "purchase"),
   ]);
+
+  const dailyRevenue = revenueRes.data?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
 
   return {
     totalUsers: usersRes.count ?? 0,
     totalFortunes: fortunesRes.count ?? 0,
     activeTellers: tellersRes.count ?? 0,
-    dailyRevenue: 0,
+    dailyRevenue: dailyRevenue,
   };
+}
+
+export async function fetchWeeklyStats() {
+  const dates = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+  });
+
+  const { data } = await supabaseAdmin
+    .from("fortunes")
+    .select("created_at")
+    .gte("created_at", dates[0]);
+
+  const statsMap: Record<string, number> = {};
+  dates.forEach(d => statsMap[d] = 0);
+
+  data?.forEach((item) => {
+    const dateKey = new Date(item.created_at).toISOString().split('T')[0];
+    if (statsMap[dateKey] !== undefined) {
+      statsMap[dateKey]++;
+    }
+  });
+
+  return dates.map(date => {
+    const d = new Date(date);
+    return {
+      label: d.toLocaleDateString('tr-TR', { weekday: 'short' }),
+      value: statsMap[date]
+    };
+  });
+}
+
+export async function fetchGrowthStats() {
+  const dates = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+  });
+
+  const { data } = await supabaseAdmin
+    .from("users")
+    .select("created_at")
+    .gte("created_at", dates[0]);
+
+  const statsMap: Record<string, number> = {};
+  dates.forEach(d => statsMap[d] = 0);
+
+  data?.forEach((item) => {
+    const dateKey = new Date(item.created_at).toISOString().split('T')[0];
+    if (statsMap[dateKey] !== undefined) {
+      statsMap[dateKey]++;
+    }
+  });
+
+  return dates.map(date => {
+    const d = new Date(date);
+    return {
+      label: d.toLocaleDateString('tr-TR', { weekday: 'short' }),
+      value: statsMap[date]
+    };
+  });
 }
 
 export async function fetchFortuneTypeStats() {
@@ -103,19 +177,19 @@ type FortuneViewRow = {
 
 export async function fetchRecentFortunes(limit = 6): Promise<Fortune[]> {
   const { data } = await supabaseAdmin
-    .from("fortunes_view")
-    .select("*")
+    .from("fortunes")
+    .select("*, users(full_name), fortune_tellers(name)")
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (!data) return [];
 
-  return (data as FortuneViewRow[]).map((row) => ({
+  return data.map((row) => ({
     id: row.id,
-    user_name: row.user_name,
+    user_name: (row.users as any)?.full_name || "Anonim",
     type: row.type,
-    teller_name: row.teller_name,
-    status: row.status,
+    teller_name: (row.fortune_tellers as any)?.name || "AI Falcı",
+    status: row.status as FortuneStatus,
     submitted_at: row.created_at,
   }));
 }
@@ -137,7 +211,7 @@ export async function fetchUsers({
   const to = from + pageSize - 1;
   let query = supabaseAdmin
     .from("users")
-    .select("*, wallet:wallet(credits), admin:admin_users(role)", { count: "exact" });
+    .select("*, wallet:wallet(credits)", { count: "exact" });
   if (search) {
     query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
   }
@@ -148,7 +222,7 @@ export async function fetchUsers({
     data?.map((u) => ({
       ...(u as any),
       credits: (u as any).wallet?.credits ?? 0,
-      admin_role: (u as any).admin?.role ?? null,
+      admin_role: null, // Admin role removed for now as valid relation is missing
     })) ?? [];
   return { data: mapped as any[], count: count ?? 0 };
 }

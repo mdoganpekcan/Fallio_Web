@@ -7,7 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Table } from "@/components/tables/table";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { fetchDashboardStats, fetchRecentFortunes, fetchRecentUsers, fetchFortuneTypeStats } from "@/lib/data";
+import { fetchDashboardStats, fetchRecentFortunes, fetchRecentUsers, fetchFortuneTypeStats, fetchWeeklyStats, fetchGrowthStats } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
 
 export default async function DashboardPage() {
@@ -15,26 +15,8 @@ export default async function DashboardPage() {
   const recentUsers = await fetchRecentUsers(5);
   const fortunes = await fetchRecentFortunes(6);
   const fortuneTypeStats = await fetchFortuneTypeStats();
-
-  const weeklyData = [
-    { label: "Mon", value: 68 },
-    { label: "Tue", value: 92 },
-    { label: "Wed", value: 80 },
-    { label: "Thu", value: 110 },
-    { label: "Fri", value: 95 },
-    { label: "Sat", value: 120 },
-    { label: "Sun", value: 140 },
-  ];
-
-  const subscriptionGrowth = [
-    { label: "Mon", value: 40 },
-    { label: "Tue", value: 55 },
-    { label: "Wed", value: 62 },
-    { label: "Thu", value: 70 },
-    { label: "Fri", value: 85 },
-    { label: "Sat", value: 98 },
-    { label: "Sun", value: 120 },
-  ];
+  const weeklyData = await fetchWeeklyStats();
+  const subscriptionGrowth = await fetchGrowthStats();
 
   return (
     <div className="space-y-6">
