@@ -4,6 +4,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { FortunePromptBuilder } from "@/lib/ai/prompt-builder";
+import { fetchPersonaByKey } from "@/lib/data";
 
 export async function GET(req: Request) {
   try {
@@ -72,6 +73,8 @@ export async function GET(req: Request) {
         const meta = fortune.metadata as any || {};
         const language = meta.language || queryLang;
         const user = fortune.users as any;
+        const normalizedKey = FortunePromptBuilder.normalizeType(fortune.type);
+        const persona = await fetchPersonaByKey(normalizedKey);
 
         const context = {
           fortuneType: fortune.type,
@@ -85,7 +88,7 @@ export async function GET(req: Request) {
           imageCount: 0 // Will be implicit in how we send images, but good for prompt text
         };
 
-        const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context);
+        const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context, persona || undefined);
         const userMessage = FortunePromptBuilder.buildUserMessage(context);
 
         const teller = Array.isArray(fortune.fortune_tellers) ? fortune.fortune_tellers[0] : fortune.fortune_tellers;

@@ -39,9 +39,9 @@ Your tone is ethereal and psychological (Jungian style). You explain what the dr
 };
 
 export class FortunePromptBuilder {
-  static buildSystemPrompt(ctx: FortuneContext): string {
+  static buildSystemPrompt(ctx: FortuneContext, personaOverride?: string): string {
     const typeKey = this.normalizeType(ctx.fortuneType);
-    const persona = PERSONAS[typeKey] || PERSONAS.default;
+    const persona = personaOverride || PERSONAS[typeKey] || PERSONAS.default;
     
     let languageInstruction = "";
     if (ctx.language === "en") {
@@ -90,7 +90,7 @@ CORE RULES:
     return message;
   }
 
-  private static normalizeType(type: string): string {
+  public static normalizeType(type: string): string {
     const t = type.toLowerCase();
     if (t.includes("kahve") || t.includes("coffee")) return "coffee";
     if (t.includes("tarot")) return "tarot";

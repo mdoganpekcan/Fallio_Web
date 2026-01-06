@@ -4,6 +4,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/ge
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { FortunePromptBuilder } from "@/lib/ai/prompt-builder";
+import { fetchPersonaByKey } from "@/lib/data";
 
 export async function POST(req: Request) {
   try {
@@ -35,6 +36,9 @@ export async function POST(req: Request) {
         }
       }
     }
+
+    const normalizedKey = FortunePromptBuilder.normalizeType(fortuneType);
+    const persona = await fetchPersonaByKey(normalizedKey);
 
     const context = {
       fortuneType: fortuneType,
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
 
     context.imageCount = imageParts.length;
 
-    const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context);
+    const systemPrompt = FortunePromptBuilder.buildSystemPrompt(context, persona || undefined);
     const userMessage = FortunePromptBuilder.buildUserMessage(context);
 
     let responseText = "";
