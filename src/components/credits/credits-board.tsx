@@ -1,11 +1,11 @@
 "use client";
 
 import { 
-  upsertCreditPackage, upsertEarningRule, upsertSubscription, 
-  deleteCreditPackage, deleteEarningRule, deleteSubscription,
-  toggleCreditPackageStatus, toggleEarningRuleStatus 
+  upsertCreditPackage, upsertSubscription, 
+  deleteCreditPackage, deleteSubscription,
+  toggleCreditPackageStatus
 } from "@/lib/actions/admin";
-import type { CreditPackage, EarningRule, SubscriptionPlan } from "@/types";
+import type { CreditPackage, SubscriptionPlan } from "@/types";
 import { useState, useTransition } from "react";
 import { Tabs } from "../ui/tabs";
 import { Card, CardContent, CardHeader } from "../ui/card";
@@ -17,11 +17,10 @@ import { Textarea } from "../ui/textarea";
 
 type Props = {
   packages: CreditPackage[];
-  earningRules: EarningRule[];
   subscriptions: SubscriptionPlan[];
 };
 
-export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
+export function CreditsBoard({ packages, subscriptions }: Props) {
   const [tab, setTab] = useState<string>("packages");
   const [pending, startTransition] = useTransition();
 
@@ -30,7 +29,6 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
       <Tabs
         items={[
           { value: "packages", label: "Kredi Paketleri" },
-          { value: "earning", label: "Elmas Kazanım Kuralları" },
           { value: "subscriptions", label: "Abonelik Avantajları" },
         ]}
         defaultValue={tab}
@@ -106,79 +104,6 @@ export function CreditsBoard({ packages, earningRules, subscriptions }: Props) {
               <div className="md:col-span-4 flex justify-end">
                 <Button type="submit" disabled={pending}>
                   Yeni Paket Ekle
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === "earning" && (
-        <Card>
-          <CardHeader
-            title="Elmas Kazanım Kuralları"
-            description="Uygulama içi ödül kuralları."
-          />
-          <CardContent className="space-y-4">
-            <Table
-              data={earningRules}
-              columns={[
-                { key: "title", header: "Kural" },
-                { key: "diamonds", header: "Elmas" },
-                {
-                  key: "active",
-                  header: "Durum",
-                  render: (rule) => (
-                    <form action={async (formData) => { await toggleEarningRuleStatus(formData); }}>
-                      <input type="hidden" name="id" value={rule.id} />
-                      <input type="hidden" name="active" value={String(rule.active)} />
-                      <button type="submit">
-                        <Badge variant={rule.active ? "success" : "muted"} className="cursor-pointer hover:opacity-80">
-                          {rule.active ? "Aktif" : "Pasif"}
-                        </Badge>
-                      </button>
-                    </form>
-                  ),
-                },
-                {
-                  key: "actions",
-                  header: "İşlemler",
-                  render: (rule) => (
-                    <form action={async (formData) => { await deleteEarningRule(formData); }}>
-                      <input type="hidden" name="id" value={rule.id} />
-                      <Button size="sm" variant="destructive" type="submit">Sil</Button>
-                    </form>
-                  )
-                }
-              ]}
-              empty="Kural bulunamadı."
-            />
-
-            <form
-              action={(formData) =>
-                startTransition(async () => {
-                  await upsertEarningRule(formData);
-                })
-              }
-              className="grid gap-3 rounded-xl bg-[var(--card)] p-4 md:grid-cols-4"
-            >
-              <Input name="title" placeholder="Başlık" required />
-              <Input name="diamonds" placeholder="Elmas" type="number" required />
-              <select
-                name="type"
-                className="h-12 rounded-xl bg-[var(--panel)] px-3 text-sm text-white"
-              >
-                <option value="ad">Ödüllü reklam</option>
-                <option value="daily">Günlük giriş</option>
-                <option value="invite">Arkadaş davet</option>
-              </select>
-              <label className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-                <input type="checkbox" name="active" defaultChecked />
-                Aktif
-              </label>
-              <div className="md:col-span-4 flex justify-end">
-                <Button type="submit" disabled={pending}>
-                  Kural Kaydet
                 </Button>
               </div>
             </form>
