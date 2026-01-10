@@ -143,14 +143,7 @@ export async function toggleCreditPackageStatus(formData: FormData) {
   return { success: true };
 }
 
-export async function toggleEarningRuleStatus(formData: FormData) {
-  const id = formData.get("id") as string;
-  const isActive = formData.get("active") === "true";
-  const { error } = await supabaseAdmin.from("earning_rules").update({ active: !isActive }).eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/credits");
-  return { success: true };
-}
+
 
 export async function deleteCreditPackage(formData: FormData) {
   const id = formData.get("id") as string;
@@ -190,30 +183,15 @@ export async function deleteUser(formData: FormData) {
 export async function adjustUserBalance(formData: FormData) {
   const id = formData.get("id") as string;
   const credits = Number(formData.get("credits"));
-  const diamonds = Number(formData.get("diamonds"));
   const { error } = await supabaseAdmin
     .from("wallet")
-    .upsert({ user_id: id, credits, diamonds }, { onConflict: "user_id" });
+    .upsert({ user_id: id, credits }, { onConflict: "user_id" });
   if (error) return { error: error.message };
   revalidatePath("/admin/users");
   return { success: true };
 }
 
-export async function upsertEarningRule(formData: FormData) {
-  const id = formData.get("id") as string | null;
-  const title = formData.get("title") as string;
-  const diamonds = Number(formData.get("diamonds"));
-  const type = formData.get("type") as string;
-  const active = formData.get("active") === "on" || formData.get("active") === "true";
 
-  const payload = { title, diamonds, type, active };
-  const { error } = id
-    ? await supabaseAdmin.from("earning_rules").update(payload).eq("id", id)
-    : await supabaseAdmin.from("earning_rules").insert(payload);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/credits");
-  return { success: true };
-}
 
 export async function upsertSubscription(formData: FormData) {
   const id = formData.get("id") as string | null;
@@ -319,13 +297,7 @@ export async function deleteSubscription(formData: FormData) {
   return { success: true };
 }
 
-export async function deleteEarningRule(formData: FormData) {
-  const id = formData.get("id") as string;
-  const { error } = await supabaseAdmin.from("earning_rules").delete().eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/credits");
-  return { success: true };
-}
+
 
 export async function upsertSetting(formData: FormData) {
   const theme = formData.get("theme") as string;
