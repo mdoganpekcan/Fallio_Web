@@ -4,7 +4,6 @@ import type {
   AdminUser,
   AppConfig,
   CreditPackage,
-  EarningRule,
   Fortune,
   FortuneStatus,
   FortuneTeller,
@@ -240,13 +239,7 @@ export async function fetchCreditPackages(): Promise<CreditPackage[]> {
   return (data as CreditPackage[]) ?? [];
 }
 
-export async function fetchEarningRules(): Promise<EarningRule[]> {
-  const { data } = await supabaseAdmin
-    .from("earning_rules")
-    .select("*")
-    .order("created_at", { ascending: true });
-  return (data as EarningRule[]) ?? [];
-}
+// fetchEarningRules removed
 
 export async function fetchSubscriptions(): Promise<SubscriptionPlan[]> {
   const { data } = await supabaseAdmin.from("subscriptions").select("*");
