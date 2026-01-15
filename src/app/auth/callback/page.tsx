@@ -15,14 +15,25 @@ function AuthCallbackContent() {
 
       if (code) {
         const supabase = createSupabaseBrowserClient();
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         
-        if (!error) {
+        if (!error && data?.session) {
+          const { access_token, refresh_token, provider_token } = data.session;
+          
+          // Tokenları hash parametresi olarak ekle (Supabase formatına uygun)
+          const params = new URLSearchParams();
+          params.append('access_token', access_token);
+          params.append('refresh_token', refresh_token);
+          params.append('token_type', 'bearer');
+          if (provider_token) params.append('provider_token', provider_token);
+
+          const redirectUrl = `fallio://auth/callback#${params.toString()}`;
+
           // Başarılı giriş sonrası mobil uygulamaya yönlendir
-          window.location.href = 'fallio://auth/callback';
+          window.location.href = redirectUrl;
           setTimeout(() => {
              // Fallback redirects
-             window.location.href = 'exp://127.0.0.1:19000/--/auth/callback';
+             // window.location.href = ... (Optional)
           }, 3000);
         } else {
              alert('Auth Error: ' + error.message);
@@ -38,14 +49,6 @@ function AuthCallbackContent() {
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
       <h1 className="text-xl font-bold mb-2">Giriş Yapılıyor...</h1>
       <p className="text-gray-400 mb-6">Lütfen bekleyin, uygulamaya yönlendiriliyorsunuz.</p>
-      
-      <a 
-        href="fallio://auth/callback"
-        className="px-6 py-3 bg-purple-600 rounded-lg font-semibold hover:bg-purple-700 transition"
-      >
-        Uygulamayı Aç
-      </a>
-      <p className="mt-4 text-xs text-gray-500">Otomatik yönlendirme çalışmazsa butona tıklayın.</p>
     </div>
   );
 }
