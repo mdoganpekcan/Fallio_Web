@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 
@@ -8,11 +8,11 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+
   useEffect(() => {
     const handleAuth = async () => {
       const code = searchParams.get('code');
-      const next = searchParams.get('next') ?? '/';
-
       if (code) {
         const supabase = createSupabaseBrowserClient();
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
@@ -20,27 +20,22 @@ function AuthCallbackContent() {
         if (!error && data?.session) {
           const { access_token, refresh_token, provider_token } = data.session;
           
-          // Tokenları hash parametresi olarak ekle (Supabase formatına uygun)
           const params = new URLSearchParams();
           params.append('access_token', access_token);
           params.append('refresh_token', refresh_token);
           params.append('token_type', 'bearer');
           if (provider_token) params.append('provider_token', provider_token);
 
-          const redirectUrl = `fallio://auth/callback#${params.toString()}`;
+          const finalUrl = `fallio://auth/callback#${params.toString()}`;
+          setRedirectUrl(finalUrl);
 
           // Başarılı giriş sonrası mobil uygulamaya yönlendir
-          window.location.href = redirectUrl;
-          setTimeout(() => {
-             // Fallback redirects
-             // window.location.href = ... (Optional)
-          }, 3000);
+          window.location.href = finalUrl;
         } else {
-             alert('Auth Error: ' + error.message);
+             alert('Auth Error: ' + (error?.message || 'Unknown error'));
         }
       }
     };
-
     handleAuth();
   }, [searchParams, router]);
 
@@ -49,6 +44,18 @@ function AuthCallbackContent() {
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
       <h1 className="text-xl font-bold mb-2">Giriş Yapılıyor...</h1>
       <p className="text-gray-400 mb-6">Lütfen bekleyin, uygulamaya yönlendiriliyorsunuz.</p>
+      
+      {redirectUrl && (
+        <>
+          <a 
+            href={redirectUrl}
+            className="px-6 py-3 bg-purple-600 rounded-lg font-semibold hover:bg-purple-700 transition"
+          >
+            Uygulamayı Aç
+          </a>
+          <p className="mt-4 text-xs text-gray-500">Otomatik yönlendirme çalışmazsa butona tıklayın.</p>
+        </>
+      )}
     </div>
   );
 }
