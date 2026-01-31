@@ -9,6 +9,7 @@ function AuthCallbackContent() {
   const searchParams = useSearchParams();
 
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     // Debug info
