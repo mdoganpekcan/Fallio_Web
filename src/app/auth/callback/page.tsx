@@ -45,6 +45,9 @@ function AuthCallbackContent() {
      setDebugInfo(window.location.href);
   }, []);
 
+  const error = searchParams.get('error');
+  const error_description = searchParams.get('error_description');
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0D0A1A] text-white p-4 text-center break-all">
       <div className="mb-6">
