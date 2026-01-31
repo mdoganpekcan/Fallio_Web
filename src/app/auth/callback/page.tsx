@@ -13,27 +13,25 @@ function AuthCallbackContent() {
   useEffect(() => {
     const handleAuth = async () => {
       const code = searchParams.get('code');
+      const error = searchParams.get('error');
+      const error_description = searchParams.get('error_description');
+
       if (code) {
-        const supabase = createSupabaseBrowserClient();
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (!error && data?.session) {
-          const { access_token, refresh_token, provider_token } = data.session;
-          
+          // PKCE Flow: Code'u mobil uygulamaya ilet (Verifier mobilde)
           const params = new URLSearchParams();
-          params.append('access_token', access_token);
-          params.append('refresh_token', refresh_token);
-          params.append('token_type', 'bearer');
-          if (provider_token) params.append('provider_token', provider_token);
+          params.append('code', code);
+          // Diğer parametreleri de ekle (state vs varsa)
+          searchParams.forEach((value, key) => {
+            if (key !== 'code') params.append(key, value);
+          });
 
-          const finalUrl = `fallio://auth/callback#${params.toString()}`;
+          const finalUrl = `fallio://auth/callback?${params.toString()}`;
           setRedirectUrl(finalUrl);
-
-          // Başarılı giriş sonrası mobil uygulamaya yönlendir
+          
+          // Otomatik yönlendirme
           window.location.href = finalUrl;
-        } else {
-             alert('Auth Error: ' + (error?.message || 'Unknown error'));
-        }
+      } else if (error) {
+          alert('Auth Error: ' + (error_description || error));
       }
     };
     handleAuth();
