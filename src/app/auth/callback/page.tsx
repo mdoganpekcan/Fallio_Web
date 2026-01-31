@@ -20,7 +20,6 @@ function AuthCallbackContent() {
           // PKCE Flow: Code'u mobil uygulamaya ilet (Verifier mobilde)
           const params = new URLSearchParams();
           params.append('code', code);
-          // Diğer parametreleri de ekle (state vs varsa)
           searchParams.forEach((value, key) => {
             if (key !== 'code') params.append(key, value);
           });
@@ -28,31 +27,55 @@ function AuthCallbackContent() {
           const finalUrl = `fallio://auth/callback?${params.toString()}`;
           setRedirectUrl(finalUrl);
           
-          // Otomatik yönlendirme
-          window.location.href = finalUrl;
+          // Android Chrome otomatik yönlendirmeyi engelleyebilir. 
+          // Bu yüzden kullanıcıdan tık beklemek en garantisidir.
+          // Yine de deneriz:
+          // window.location.href = finalUrl; 
       } else if (error) {
-          alert('Auth Error: ' + (error_description || error));
+          setRedirectUrl(null);
+          // Hata mesajını ekranda göster
       }
     };
     handleAuth();
   }, [searchParams, router]);
 
+  const error = searchParams.get('error');
+  const error_description = searchParams.get('error_description');
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0D0A1A] text-white p-4 text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
-      <h1 className="text-xl font-bold mb-2">Giriş Yapılıyor...</h1>
-      <p className="text-gray-400 mb-6">Lütfen bekleyin, uygulamaya yönlendiriliyorsunuz.</p>
+      <div className="mb-6">
+        {/* Logo or Icon */}
+        <div className="text-4xl">🌟</div>
+      </div>
       
-      {redirectUrl && (
-        <>
-          <a 
+      <h1 className="text-xl font-bold mb-2">Giriş Onayı</h1>
+      
+      {redirectUrl ? (
+        <div className="space-y-4">
+           <p className="text-green-400">Giriş kodu alındı! Devam etmek için butona basın.</p>
+           
+           <a 
             href={redirectUrl}
-            className="px-6 py-3 bg-purple-600 rounded-lg font-semibold hover:bg-purple-700 transition"
+            className="block w-full px-8 py-4 bg-purple-600 rounded-xl font-bold text-lg hover:bg-purple-700 transition shadow-lg shadow-purple-900/50"
           >
-            Uygulamayı Aç
+            UYGULAMADA AÇ
           </a>
-          <p className="mt-4 text-xs text-gray-500">Otomatik yönlendirme çalışmazsa butona tıklayın.</p>
-        </>
+          
+          <p className="text-xs text-gray-500 mt-2">
+             Debug: {redirectUrl.slice(0, 50)}...
+          </p>
+        </div>
+      ) : error ? (
+        <div className="text-red-500 bg-red-900/20 p-4 rounded-lg">
+           <p className="font-bold">Hata Oluştu:</p>
+           <p>{error_description || error}</p>
+        </div>
+      ) : (
+         <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+            <p className="text-gray-400">Giriş bilgileri bekleniyor...</p>
+         </div>
       )}
     </div>
   );
