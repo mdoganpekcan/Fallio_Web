@@ -39,13 +39,15 @@ function AuthCallbackContent() {
     handleAuth();
   }, [searchParams, router]);
 
-  const error = searchParams.get('error');
-  const error_description = searchParams.get('error_description');
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  useEffect(() => {
+     setDebugInfo(window.location.href);
+  }, []);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0D0A1A] text-white p-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0D0A1A] text-white p-4 text-center break-all">
       <div className="mb-6">
-        {/* Logo or Icon */}
         <div className="text-4xl">🌟</div>
       </div>
       
@@ -61,10 +63,6 @@ function AuthCallbackContent() {
           >
             UYGULAMADA AÇ
           </a>
-          
-          <p className="text-xs text-gray-500 mt-2">
-             Debug: {redirectUrl.slice(0, 50)}...
-          </p>
         </div>
       ) : error ? (
         <div className="text-red-500 bg-red-900/20 p-4 rounded-lg">
@@ -72,9 +70,14 @@ function AuthCallbackContent() {
            <p>{error_description || error}</p>
         </div>
       ) : (
-         <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+         <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
             <p className="text-gray-400">Giriş bilgileri bekleniyor...</p>
+            <div className="text-xs text-gray-600 bg-black/50 p-2 rounded">
+                <p>DEBUG INFO:</p>
+                <p>{debugInfo}</p>
+                <p>Code: {searchParams.get('code') ? 'YES' : 'NO'}</p>
+            </div>
          </div>
       )}
     </div>
