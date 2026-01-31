@@ -11,39 +11,38 @@ function AuthCallbackContent() {
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleAuth = async () => {
-      const code = searchParams.get('code');
-      const error = searchParams.get('error');
-      const error_description = searchParams.get('error_description');
+    // Debug info
+    setDebugInfo(window.location.href);
 
+    const handleAuth = async () => {
+      // 1. Check for PKCE Code (Server Side Params)
+      const code = searchParams.get('code');
+      
       if (code) {
-          // PKCE Flow: Code'u mobil uygulamaya ilet (Verifier mobilde)
           const params = new URLSearchParams();
           params.append('code', code);
           searchParams.forEach((value, key) => {
             if (key !== 'code') params.append(key, value);
           });
-
           const finalUrl = `fallio://auth/callback?${params.toString()}`;
           setRedirectUrl(finalUrl);
-          
-          // Android Chrome otomatik yönlendirmeyi engelleyebilir. 
-          // Bu yüzden kullanıcıdan tık beklemek en garantisidir.
-          // Yine de deneriz:
-          // window.location.href = finalUrl; 
-      } else if (error) {
-          setRedirectUrl(null);
-          // Hata mesajını ekranda göster
+          return;
+      }
+
+      // 2. Check for Implicit Flow (Hash Params - Client Side)
+      // Supabase bazen (özellikle web redirect ayarlarında) tokenları # ile döner
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+          // #access_token=...&refresh_token=...
+          // Hash başındaki # karakterini kaldırıp deep link'e ekle
+          const cleanHash = hash.substring(1); 
+          const finalUrl = `fallio://auth/callback#${cleanHash}`;
+          setRedirectUrl(finalUrl);
       }
     };
+
     handleAuth();
   }, [searchParams, router]);
-
-  const [debugInfo, setDebugInfo] = useState<string>('');
-
-  useEffect(() => {
-     setDebugInfo(window.location.href);
-  }, []);
 
   const error = searchParams.get('error');
   const error_description = searchParams.get('error_description');
