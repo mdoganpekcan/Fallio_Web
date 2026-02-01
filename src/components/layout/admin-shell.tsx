@@ -36,6 +36,7 @@ const navItems = [
   { href: "/admin/credits", label: "Kredi & Ekonomi", icon: CreditCard },
   { href: "/admin/notifications", label: "Bildirim Merkezi", icon: Bell },
   { href: "/admin/prompts", label: "Yapay Zeka Promptları", icon: MessageSquareText },
+  { href: "/admin/logs", label: "Sentinel Logs (Beta)", icon: GaugeCircle },
   { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings2 },
 ];
 
