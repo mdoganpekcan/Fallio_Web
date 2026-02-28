@@ -54,19 +54,16 @@ export async function middleware(req: NextRequest) {
 
   let adminUser: { id: string; role: string } | null = null;
   if (user) {
-    console.log("--- Middleware: Checking Admin Role ---");
-    const { data, error: dbError } = await supabase
-      .from("admin_users")
-      .select("id, role")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    if (dbError) {
-      console.error("❌ Middleware Veritabanı Hatası:", dbError);
+    console.log("--- Middleware: Checking Admin Role via JWT ---");
+    // Get role from JWT app_metadata injected by our PostgreSQL trigger
+    const role = user.app_metadata?.role;
+    
+    if (role) {
+      adminUser = { id: user.id, role: role as string };
+      console.log("Admin User Role from JWT:", adminUser.role);
+    } else {
+      console.log("No admin role found in JWT.");
     }
-
-    adminUser = data as { id: string; role: string } | null;
-    console.log("Admin User Data:", adminUser);
   }
 
   if (user && !adminUser) {
