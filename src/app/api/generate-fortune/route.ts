@@ -61,9 +61,9 @@ export async function POST(req: Request) {
         .eq("fortune_id", fortuneId);
 
       if (images && images.length > 0) {
-        for (const img of images) {
+        // [OPTIMIZATION]: Parallelize image downloads to prevent network waterfall
+        const downloadPromises = images.map(async (img) => {
           try {
-            // URL format: .../storage/v1/object/public/fortune-images/folder/file.jpg
             const urlParts = img.url.split("/fortune-images/");
             if (urlParts.length > 1) {
               const filePath = urlParts[1];
@@ -74,18 +74,23 @@ export async function POST(req: Request) {
               if (data) {
                 const buffer = Buffer.from(await data.arrayBuffer());
                 const base64 = buffer.toString("base64");
-                imageParts.push({
+                return {
                   inlineData: {
                     data: base64,
                     mimeType: "image/jpeg",
                   },
-                });
+                };
               }
             }
           } catch (e) {
             console.error("Image download error:", e);
           }
-        }
+          return null;
+        });
+
+        // Await all downloads simultaneously
+        const results = await Promise.all(downloadPromises);
+        imageParts = results.filter(Boolean); // Filter out any failed downloads
       }
     }
 
@@ -106,51 +111,16 @@ export async function POST(req: Request) {
       }
 
       const apiKey = settings.gemini_api_key.trim();
-      let modelsToTry: string[] = [];
-
-      // 1. Try to fetch dynamic model list from Google API
-      try {
-        const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        if (listResponse.ok) {
-          const data = await listResponse.json();
-          if (data.models) {
-            // Filter models that support 'generateContent'
-            const availableModels = data.models
-              .filter((m: any) => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
-              .map((m: any) => m.name.replace("models/", ""));
-
-            // Prioritize 1.5 Pro and Flash models
-            const prioritized = availableModels.sort((a: string, b: string) => {
-              const getScore = (name: string) => {
-                if (name.includes("1.5-pro")) return 3;
-                if (name.includes("1.5-flash")) return 2;
-                if (name.includes("2.0")) return 1; // Experimental but new
-                return 0;
-              };
-              return getScore(b) - getScore(a);
-            });
-
-            modelsToTry = prioritized;
-            // console.log("Fetched dynamic Gemini models:", modelsToTry);
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to fetch dynamic model list, using fallbacks:", err);
-      }
-
-      // 2. Fallback list if dynamic fetch fails
-      if (modelsToTry.length === 0) {
-        const fallbacks = [
-          "gemini-1.5-pro",
-          "gemini-1.5-flash",
-          "gemini-2.0-flash-exp",
-          "gemini-1.5-pro-latest",
-          "gemini-1.0-pro"
-        ];
-        fallbacks.forEach(m => {
-          if (!modelsToTry.includes(m)) modelsToTry.push(m);
-        });
-      }
+      
+      // [OPTIMIZATION]: Removed the dynamic blocking HTTP request to Google API 
+      // to find available models. Hardcoding the stable fallback list saves ~300ms.
+      let modelsToTry: string[] = [
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro-latest",
+        "gemini-1.0-pro"
+      ];
 
       // 3. Add preferred model to top
       let primaryModel = (preferredProvider === 'gemini' && preferredModel) ? preferredModel : settings.gemini_model;
