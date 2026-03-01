@@ -258,9 +258,8 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("AI Generation Error:", error);
-    Sentry.captureException(error, {
-      extra: { fortuneId, fortuneType },
-    });
+    // Note: fortuneId/fortuneType may not be in scope here (error could occur at req.json())
+    Sentry.captureException(error);
     return NextResponse.json({ error: error.message || "Bir hata oluştu." }, { status: 500 });
   }
 }
