@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import OpenAI from "openai";
@@ -148,9 +149,12 @@ export async function POST(req: Request) {
           if (text) return text;
         } catch (e: any) {
           console.error(`Gemini Error (${modelName}):`, e.message);
-
-          // Only push error if it's the last model we tried
+          // Report to Sentry only for the last failed model to avoid event flooding
           if (modelName === modelsToTry[modelsToTry.length - 1]) {
+            Sentry.captureException(e, {
+              tags: { provider: 'gemini', model: modelName },
+              extra: { fortuneId, fortuneType },
+            });
             errors.push(`Gemini Error (Last attempt ${modelName}): ${e.message}`);
           }
         }
@@ -185,6 +189,10 @@ export async function POST(req: Request) {
         return completion.choices[0].message.content || "";
       } catch (e: any) {
         console.error("OpenAI Error:", e);
+        Sentry.captureException(e, {
+          tags: { provider: 'openai' },
+          extra: { fortuneId, fortuneType },
+        });
         errors.push(`OpenAI Error: ${e.message}`);
         return null;
       }
@@ -207,6 +215,10 @@ export async function POST(req: Request) {
         return msg.content[0].text;
       } catch (e: any) {
         console.error("Claude Error:", e);
+        Sentry.captureException(e, {
+          tags: { provider: 'claude' },
+          extra: { fortuneId, fortuneType },
+        });
         errors.push(`Claude Error: ${e.message}`);
         return null;
       }
@@ -232,6 +244,11 @@ export async function POST(req: Request) {
     }
 
     if (!responseText) {
+      // All 3 providers failed — this is a critical event worth tracking explicitly
+      Sentry.captureMessage("All AI providers failed to generate fortune", {
+        level: "error",
+        extra: { fortuneId, fortuneType, preferredProvider, errors },
+      });
       return NextResponse.json({
         error: "Hiçbir AI sağlayıcısı yanıt vermedi. Detaylar: " + errors.join(", ")
       }, { status: 500 });
@@ -241,6 +258,9 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("AI Generation Error:", error);
+    Sentry.captureException(error, {
+      extra: { fortuneId, fortuneType },
+    });
     return NextResponse.json({ error: error.message || "Bir hata oluştu." }, { status: 500 });
   }
 }

@@ -1,11 +1,24 @@
 import * as Sentry from "@sentry/nextjs";
 
+const isProd = process.env.NODE_ENV === "production";
+
 Sentry.init({
-    dsn: "https://00ff7c6399ca05eaaec56f1a6ead4f74@o4510608881025024.ingest.de.sentry.io/4510608887447632",
+  // ✅ Correct DSN — must match the server/edge config
+  dsn: "https://659aeff71422287dcb9c88784bf1e71c@o4510608881025024.ingest.de.sentry.io/4510608889872464",
 
-    // Adjust this value in production, or use tracesSampler for greater control
-    tracesSampleRate: 1,
+  // Tag environment so dev/prod errors are separated in Sentry dashboard
+  environment: process.env.NODE_ENV ?? "development",
 
-    // Setting this option to true will print useful information to the console while you're setting up Sentry.
-    debug: false,
+  // Production: 10% of traces. Development: 100% for easy debugging.
+  tracesSampleRate: isProd ? 0.1 : 1.0,
+
+  // Replay: capture ALL error sessions, 5% of normal sessions in production
+  replaysOnErrorSampleRate: 1.0,
+  replaysSessionSampleRate: isProd ? 0.05 : 1.0,
+
+  integrations: [
+    Sentry.replayIntegration(),
+  ],
+
+  debug: false,
 });
