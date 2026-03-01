@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Log a transaction record for revenue reporting
-      await supabaseAdmin
+      const { error: txError } = await supabaseAdmin
         .from("transactions")
         .insert({
           user_id: app_user_id,
@@ -200,9 +200,11 @@ export async function POST(req: NextRequest) {
           status: "completed",
           credits_amount: 0,
           metadata: { product_id, event_type: type, expires_at: expiresAt },
-        })
-        .onConflict("provider_transaction_id")
-        .ignore();
+        });
+
+      if (txError && txError.code !== '23505') { // 23505 is unique_violation
+         console.error("[RevenueCat Webhook] Failed to log subscription transaction:", txError);
+      }
 
       console.log(
         `[RevenueCat Webhook] ✅ Subscription ACTIVATED for user ${app_user_id} (expires: ${expiresAt})`
